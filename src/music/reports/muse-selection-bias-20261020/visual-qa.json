@@ -1,0 +1,24 @@
+{
+  "inspected": [
+    "figures/matching_and_duplicates.png"
+  ],
+  "checks": [
+    "equal axes and aspect",
+    "shared probability color legends",
+    "all observations retained",
+    "labels and panel layout readable"
+  ],
+  "protected_inputs_unchanged": 10,
+  "original_run_result": "PASS",
+  "_share_copy": {
+    "kind": "sanitized-aggregate-share-v1",
+    "source": "src/music/.local/muse-selection-bias-20261020-v1/visual-qa.json",
+    "original_sha256": "9ffb250547cd8404599e0926aafcfd270d9d755360ce6714fb7fe03c02264eaf",
+    "original_run_only": true,
+    "models": "MuSe population aggregates",
+    "redactions": [
+      "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+      "공유하지 않는 점별 산점도 이름 제외"
+    ]
+  }
+}

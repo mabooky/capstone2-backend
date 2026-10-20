@@ -1,0 +1,54 @@
+{
+  "pngs": {
+    "figures/matching_and_duplicates.png": {
+      "width": 3280,
+      "height": 1630,
+      "sha256": "b06afd4aee0a74f35f82fd84bc015f0e17eaecf81fe6e86ebdce1d117c405dae",
+      "bytes": 313790
+    }
+  },
+  "target_density_checks": 50,
+  "protected_input_hashes_unchanged": true,
+  "png_crc_verified": true,
+  "source_sha256": {
+    "src/music/collectors/report_muse_selection.py": "3f080adee629fe12599a5f1845339c09d2727acd8ff79ba2a6e2c1484a40a5f0",
+    "src/music/collectors/analyze_muse_selection.py": "9d9ac6975e7240bde433cb10fcf3344bffdeb1cf5ac8b9b12a2c9b3b2c391f94",
+    "src/music/collectors/render_muse_selection.ps1": "3f629a77178b84130a1e2b601df1fcf66d9bf4cf11e1fa31be0b72f82e932c34",
+    "src/music/collectors/render_coordinate_plots.ps1": "8e3894d1d6aa98b20bd63a56c4b172a0341e5b2c2744341479cb879730181826"
+  },
+  "overall_raw_contrast": {
+    "valence": {
+      "ks_distance": 0.017021039376506786,
+      "wasserstein_1": 0.043593759898371325,
+      "mean_delta": 0.04320775023925982,
+      "standardized_mean_difference": 0.027833226817939268,
+      "stddev_ratio": 0.9992212009876663,
+      "srs_without_replacement_reference_se": 0.007721324464577855,
+      "delta_over_srs_reference_se": 5.595898791389814
+    },
+    "arousal": {
+      "ks_distance": 0.024590944599644893,
+      "wasserstein_1": 0.035061637197550434,
+      "mean_delta": -0.026079334044379898,
+      "standardized_mean_difference": -0.022457890656720783,
+      "stddev_ratio": 1.011402646026822,
+      "srs_without_replacement_reference_se": 0.005740849051758467,
+      "delta_over_srs_reference_se": -4.542766028030574
+    }
+  },
+  "population_units_explicit": true,
+  "duplicates_not_merged": true,
+  "previous_artifacts_verified": 17,
+  "original_run_result": "PASS",
+  "_share_copy": {
+    "kind": "sanitized-aggregate-share-v1",
+    "source": "src/music/.local/muse-selection-bias-20261020-v1/result.json",
+    "original_sha256": "408da124c82b418d3d65f590c0de8c9b8ace5a1851c17971bee5e4ab0a6094d1",
+    "original_run_only": true,
+    "models": "MuSe population aggregates",
+    "redactions": [
+      "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+      "미공유 산점도 PNG·원본 REPORT 해시 제외; 코드 해시 키를 상대경로로 변경"
+    ]
+  }
+}

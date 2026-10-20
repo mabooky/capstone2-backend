@@ -1,0 +1,142 @@
+{
+  "models": {
+    "B1": {
+      "n": 27948,
+      "valence": {
+        "mean": 0.22157491002920277,
+        "stddev": 0.344838967020159,
+        "min": -0.9135889872173059,
+        "max": 0.8822222222222222
+      },
+      "arousal": {
+        "mean": -0.046418642451158974,
+        "stddev": 0.25951538289469017,
+        "min": -0.9380952380952381,
+        "max": 0.6155555555555556
+      },
+      "pearson_v_a": 0.40044720095529474,
+      "quadrants": {
+        "--": {
+          "count": 5169,
+          "percent": 18.495062258480033
+        },
+        "-+": {
+          "count": 2494,
+          "percent": 8.923715471590096
+        },
+        "+-": {
+          "count": 10836,
+          "percent": 38.77200515242593
+        },
+        "++": {
+          "count": 9449,
+          "percent": 33.809217117503934
+        }
+      },
+      "near_origin": {
+        ".05": {
+          "radius": 0.05,
+          "count": 134,
+          "percent": 0.479461857735795
+        },
+        ".1": {
+          "radius": 0.1,
+          "count": 681,
+          "percent": 2.4366680978960926
+        }
+      },
+      "histogram": {
+        "bins": 80,
+        "bin_width": 0.025,
+        "occupied_bins": 2216,
+        "empty_bins": 4184,
+        "empty_bin_percent": 65.375,
+        "max_bin_count": 358,
+        "peak_cell": {
+          "v_min": -0.15000000000000002,
+          "v_max": -0.125,
+          "a_min": 0.25,
+          "a_max": 0.2749999999999999
+        }
+      }
+    },
+    "B2": {
+      "n": 27948,
+      "valence": {
+        "mean": 0.2772056056144205,
+        "stddev": 0.37664450281328044,
+        "min": -0.962657874387834,
+        "max": 0.9987864077669902
+      },
+      "arousal": {
+        "mean": 0.16812874111069384,
+        "stddev": 0.32612054808147745,
+        "min": -0.9523985156526387,
+        "max": 1.0
+      },
+      "pearson_v_a": 0.40044720095529474,
+      "quadrants": {
+        "--": {
+          "count": 3736,
+          "percent": 13.367682839559182
+        },
+        "-+": {
+          "count": 3350,
+          "percent": 11.986546443394877
+        },
+        "+-": {
+          "count": 4893,
+          "percent": 17.507513954486903
+        },
+        "++": {
+          "count": 15969,
+          "percent": 57.13825676255904
+        }
+      },
+      "near_origin": {
+        ".05": {
+          "radius": 0.05,
+          "count": 265,
+          "percent": 0.9481894947760126
+        },
+        ".1": {
+          "radius": 0.1,
+          "count": 812,
+          "percent": 2.9053957349363104
+        }
+      },
+      "histogram": {
+        "bins": 80,
+        "bin_width": 0.025,
+        "occupied_bins": 2814,
+        "empty_bins": 3586,
+        "empty_bin_percent": 56.03125,
+        "max_bin_count": 355,
+        "peak_cell": {
+          "v_min": -0.125,
+          "v_max": -0.09999999999999998,
+          "a_min": 0.5249999999999999,
+          "a_max": 0.55
+        }
+      }
+    }
+  },
+  "standard_deviation": "population (ddof=0)",
+  "near_origin": "Euclidean normalized coordinate radius <= 0.1 (also report <=0.05)",
+  "quadrant_axis_policy": "Zero belongs to positive side",
+  "same_spotify_id_mapping": true,
+  "_share_copy": {
+    "kind": "sanitized-aggregate-share-v1",
+    "source": "src/music/.local/music-coordinate-visualization-20261020-v1/statistics.json",
+    "original_sha256": "e533506ea3cc5375b56da61c7b43279fd5cab85692d690ba67f9ff749470547a",
+    "original_run_only": true,
+    "models": [
+      "B1",
+      "B2"
+    ],
+    "redactions": [
+      "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+      "A/C1/C2 좌표 집계 제외"
+    ]
+  }
+}

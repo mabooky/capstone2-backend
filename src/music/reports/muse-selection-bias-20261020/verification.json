@@ -1,0 +1,73 @@
+{
+  "fixed_full_population_normalization": true,
+  "common_b1_b2_coordinates_matched": true,
+  "no_coordinate_merging": true,
+  "no_generated_observations": true,
+  "read_only_sqlite": true,
+  "source_rows": 90408,
+  "source_id_rows": 61902,
+  "source_unique_ids": 60741,
+  "common_ids": 27948,
+  "disjoint_partition_conserved": true,
+  "frames": {
+    "all_rows": {
+      "observations": 90408,
+      "total_weight": 90408.0
+    },
+    "id_rows": {
+      "observations": 61902,
+      "total_weight": 61902.0
+    },
+    "id_balanced": {
+      "observations": 61902,
+      "total_weight": 60741.0
+    },
+    "common": {
+      "observations": 27948,
+      "total_weight": 27948.0
+    },
+    "missing_id": {
+      "observations": 28506,
+      "total_weight": 28506.0
+    },
+    "duplicate_rows": {
+      "observations": 2224,
+      "total_weight": 2224.0
+    },
+    "singletons": {
+      "observations": 59678,
+      "total_weight": 59678.0
+    },
+    "href_singletons": {
+      "observations": 37171,
+      "total_weight": 37171.0
+    },
+    "not_returned_singletons": {
+      "observations": 22507,
+      "total_weight": 22507.0
+    },
+    "held_metadata_singletons": {
+      "observations": 9222,
+      "total_weight": 9222.0
+    },
+    "href_rows": {
+      "observations": 38501,
+      "total_weight": 38501.0
+    }
+  },
+  "duplicate_va_conflicts": 965,
+  "external_api_calls": 0,
+  "shared_db_connections": 0,
+  "original_run_result": "PASS",
+  "_share_copy": {
+    "kind": "sanitized-aggregate-share-v1",
+    "source": "src/music/.local/muse-selection-bias-20261020-v1/verification.json",
+    "original_sha256": "517e7c0e97f7b616bfc7cffba5287e6e9256a4cea9ffae6a9c80e88e325d67bc",
+    "original_run_only": true,
+    "models": "MuSe population aggregates",
+    "redactions": [
+      "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+      "비공개 입력 해시 맵과 소수 집단/strict frame 메타데이터 제외"
+    ]
+  }
+}

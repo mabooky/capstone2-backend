@@ -1,0 +1,74 @@
+{
+  "configurations": {
+    "theoretical": {
+      "valence": {
+        "version": "muse-theoretical-v1",
+        "provider": "muse",
+        "metric": "valence",
+        "raw_min": "0",
+        "raw_max": "9",
+        "source_version": "zenodo-4281165-v1.0.0",
+        "source_sha256": "56be88aea7dfa2c0446e0d7cc033d95c3550a3dc4364ac91c815cf998265fd2b",
+        "population_rows": 90408,
+        "kind": "theoretical",
+        "formula": "2*(x-raw_min)/(raw_max-raw_min)-1",
+        "policy_date": "2026-10-17"
+      },
+      "arousal": {
+        "version": "muse-theoretical-v1",
+        "provider": "muse",
+        "metric": "arousal",
+        "raw_min": "0",
+        "raw_max": "9",
+        "source_version": "zenodo-4281165-v1.0.0",
+        "source_sha256": "56be88aea7dfa2c0446e0d7cc033d95c3550a3dc4364ac91c815cf998265fd2b",
+        "population_rows": 90408,
+        "kind": "theoretical",
+        "formula": "2*(x-raw_min)/(raw_max-raw_min)-1",
+        "policy_date": "2026-10-17"
+      }
+    },
+    "observed": {
+      "valence": {
+        "version": "muse-observed-v1",
+        "provider": "muse",
+        "metric": "valence",
+        "raw_min": "0.23500000000000001",
+        "raw_max": "8.475",
+        "source_version": "zenodo-4281165-v1.0.0",
+        "source_sha256": "56be88aea7dfa2c0446e0d7cc033d95c3550a3dc4364ac91c815cf998265fd2b",
+        "population_rows": 90408,
+        "kind": "observed",
+        "formula": "2*(x-raw_min)/(raw_max-raw_min)-1",
+        "policy_date": "2026-10-17"
+      },
+      "arousal": {
+        "version": "muse-observed-v1",
+        "provider": "muse",
+        "metric": "arousal",
+        "raw_min": "0.1081132075471698",
+        "raw_max": "7.27",
+        "source_version": "zenodo-4281165-v1.0.0",
+        "source_sha256": "56be88aea7dfa2c0446e0d7cc033d95c3550a3dc4364ac91c815cf998265fd2b",
+        "population_rows": 90408,
+        "kind": "observed",
+        "formula": "2*(x-raw_min)/(raw_max-raw_min)-1",
+        "policy_date": "2026-10-17"
+      }
+    }
+  },
+  "histogram": "Same 80x80 bins; probability percentage per bin; main panels share one log color scale across both fixed normalizations.",
+  "quantiles": "Inverse weighted empirical CDF for all frames; no interpolated/averaged song coordinates.",
+  "id_balancing": "Each actual source row has weight 1/group_size; IDs total 1. Sensitivity distribution, not merged/verified unique song coordinates.",
+  "inference": "Finite-population descriptive contrasts. Nested subsets are not independent samples. No iid KS p-values, bootstrap, permutation or generated data. SRS reference is an analytic benchmark only, not the actual selection design.",
+  "_share_copy": {
+    "kind": "sanitized-aggregate-share-v1",
+    "source": "src/music/.local/muse-selection-bias-20261020-v1/method.json",
+    "original_sha256": "abb078e805ba779a451a3c29907dffb26f8b21e04e6ca1ef1b5d10cb0f4b287e",
+    "original_run_only": true,
+    "models": "MuSe population aggregates",
+    "redactions": [
+      "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분"
+    ]
+  }
+}

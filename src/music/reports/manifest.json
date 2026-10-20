@@ -1,0 +1,373 @@
+{
+  "kind": "aggregate-sharing-manifest-v1",
+  "date": "2026-10-20",
+  "candidate_count": 36,
+  "accepted_candidates": 24,
+  "excluded_candidates": 12,
+  "scope": "MuSe aggregate excerpts only; A/C1/C2 content-dependent results withheld",
+  "original_verification_not_shared_copy_hash": true,
+  "files": [
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/REPORT.md",
+      "source_sha256": "fad18374c6c199ccee945ac906e81959baff4d0eff5f0486f15ec70f861dd025",
+      "decision": "sanitized-excerpt",
+      "destination": "src/music/reports/muse-selection-bias-20261020/REPORT.md",
+      "changes": [
+        "공유용 발췌 보고서로 재구성; 원본 전체 보고서와 구분"
+      ],
+      "shared_sha256": "f07621d2582fc108ad2cbda3921b74ca03e4de1bc41eeaea0bf20060a3522eb9",
+      "shared_bytes": 4088
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/comparison_observed.png",
+      "source_sha256": "fe3f648a5a4716da808db7a39ebe67a47e0715d2f70f96e8a6eb50f35f4528b4",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/comparison_theoretical.png",
+      "source_sha256": "8a6d27c3bfbe77ad81e92b62609bb7f0865afedf9692a713702ace2d9a1b839b",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/contrasts.json",
+      "source_sha256": "67371c59acd8fb1fa895e6c71762427552a0678b3646b3d5fbf8f4bbc3980391",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/contrasts.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "한 행 탈락을 직접 비교하거나 역산하는 strict 단계 비교 2개 제외"
+      ],
+      "shared_sha256": "9c7a4932817720eb935bfe7c525d8938d44cf02baf00fa02d971fbca17b47b66",
+      "shared_bytes": 25628
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/flow.json",
+      "source_sha256": "47dccda05ba3107b7b8a2feeef3a683416028b2db51d7de697c60d07b8a52473",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/flow.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분"
+      ],
+      "shared_sha256": "f8b26af05d2d6ec33f6dbdf8c6b6fcc2523146dfaf743068cf3966248b0ec966",
+      "shared_bytes": 1075
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/matching_and_duplicates.png",
+      "source_sha256": "b06afd4aee0a74f35f82fd84bc015f0e17eaecf81fe6e86ebdce1d117c405dae",
+      "decision": "unchanged-aggregate-image",
+      "destination": "src/music/reports/muse-selection-bias-20261020/figures/matching_and_duplicates.png",
+      "changes": [
+        "MuSe 집계 밀도 PNG 바이트 동일 복사; 픽셀/축/정규화 변경 없음"
+      ],
+      "shared_sha256": "b06afd4aee0a74f35f82fd84bc015f0e17eaecf81fe6e86ebdce1d117c405dae",
+      "shared_bytes": 313790
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/method.json",
+      "source_sha256": "abb078e805ba779a451a3c29907dffb26f8b21e04e6ca1ef1b5d10cb0f4b287e",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/method.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분"
+      ],
+      "shared_sha256": "93604dd541def6ea0bcb0d60ea4345afae1cd14e33eb9f89fd02e678d4e055f3",
+      "shared_bytes": 3163
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/recommendation_connection.json",
+      "source_sha256": "a8723a4b548f38f3913e3e494ba2de8f8baec50735beefd03904903854f02e8f",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/recommendation_connection.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분"
+      ],
+      "shared_sha256": "2136c8ff8b2f5c6ceba82301a2d0dcf830b0b4e25e96c886a01f9584d2af6bd4",
+      "shared_bytes": 7119
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/render-verification.json",
+      "source_sha256": "76be77c8a9f8ab3e45267b6dada444fc82fa29c68f598df6ed12bbf1b79c7596",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/render-verification.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "공유하지 않는 점별 산점도 렌더 카운터 제외"
+      ],
+      "shared_sha256": "666d8e9f9c2f2571064d19274a8607ba4143882a09de3a993716ec0b20f42b38",
+      "shared_bytes": 990
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/result.json",
+      "source_sha256": "408da124c82b418d3d65f590c0de8c9b8ace5a1851c17971bee5e4ab0a6094d1",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/result.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "미공유 산점도 PNG·원본 REPORT 해시 제외; 코드 해시 키를 상대경로로 변경"
+      ],
+      "shared_sha256": "b05ac7d0bbee455f708eb0b2221c39531fc5d7eaf1b3cfdfcdbafee38e50d0bb",
+      "shared_bytes": 2361
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/selection_bias_all.png",
+      "source_sha256": "969d1664ac65258b05132587217c14f4283da361dadc8248b399eef422f69e4e",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/statistics.json",
+      "source_sha256": "5a0b5808c2164ddfb469893a5eedf59dd8712f5afa87a0b7d981a44c2213d09a",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/statistics.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "1행 feature_missing 및 그와 대조되는 strict 집합 2개 제외; 개별 좌표/차분 복원 위험 축소"
+      ],
+      "shared_sha256": "e8ca5c00dd37cbb79b1e27b00c4aa9826f0247705a924d869ed56c51322bced9",
+      "shared_bytes": 47934
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/target_density_connection.json",
+      "source_sha256": "591949fbe27d32bc5b19feba77d4bd8f56700a62fedb3f2cd4dbea117816760d",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/target_density_connection.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분"
+      ],
+      "shared_sha256": "5c750743423fad1a1029e71d27930d6d27dec553024237be6b97c8c43c437f13",
+      "shared_bytes": 38218
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/verification.json",
+      "source_sha256": "517e7c0e97f7b616bfc7cffba5287e6e9256a4cea9ffae6a9c80e88e325d67bc",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/verification.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "비공개 입력 해시 맵과 소수 집단/strict frame 메타데이터 제외"
+      ],
+      "shared_sha256": "df17f06369bd9718fb98b0f16892dec9f9d64f558773bd6b4b2952aae57ff23e",
+      "shared_bytes": 2047
+    },
+    {
+      "source": "src/music/.local/muse-selection-bias-20261020-v1/visual-qa.json",
+      "source_sha256": "9ffb250547cd8404599e0926aafcfd270d9d755360ce6714fb7fe03c02264eaf",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/muse-selection-bias-20261020/visual-qa.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "공유하지 않는 점별 산점도 이름 제외"
+      ],
+      "shared_sha256": "5a80e7ba19aa2e54d502c8451e22557029b301f60457f94351eef6e5085ec6cc",
+      "shared_bytes": 815
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/REPORT.md",
+      "source_sha256": "d8351ca1dd7f5cbc087836dc6e696c63a48d9b478764e0da486b5bb56e569777",
+      "decision": "sanitized-excerpt",
+      "destination": "src/music/reports/coordinate-distributions-20261020/REPORT.md",
+      "changes": [
+        "공유용 발췌 보고서로 재구성; 원본 전체 보고서와 구분"
+      ],
+      "shared_sha256": "64712e9864ffffd91b6c3407cfa4a568a5eedaba5bfcb47242e1b11755e8b426",
+      "shared_bytes": 1949
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/comparison_all.png",
+      "source_sha256": "9601b0e7ad0042337d01b8a2aff1ad50ac9b628ad89b8c89f69d5f42af7943f6",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/density_A.png",
+      "source_sha256": "b64356e28141857625a8b986410a036765e6200a8410edbd1b772ccbaec656af",
+      "decision": "excluded-pending-review",
+      "reason": "ReccoBeats 파생 밀도: 공개·재배포 조건 확인 전 보류",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/density_B1.png",
+      "source_sha256": "1268f51aab720f9e52a864646b745362230571729ddbddfde4bbe76976f998c3",
+      "decision": "unchanged-aggregate-image",
+      "destination": "src/music/reports/coordinate-distributions-20261020/figures/density_B1.png",
+      "changes": [
+        "MuSe 집계 밀도 PNG 바이트 동일 복사; 픽셀/축/정규화 변경 없음"
+      ],
+      "shared_sha256": "1268f51aab720f9e52a864646b745362230571729ddbddfde4bbe76976f998c3",
+      "shared_bytes": 86692
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/density_B2.png",
+      "source_sha256": "b24d8911fd75eed6915c7d1fa39f959180443d2ca5cab76a926c3891637b4c05",
+      "decision": "unchanged-aggregate-image",
+      "destination": "src/music/reports/coordinate-distributions-20261020/figures/density_B2.png",
+      "changes": [
+        "MuSe 집계 밀도 PNG 바이트 동일 복사; 픽셀/축/정규화 변경 없음"
+      ],
+      "shared_sha256": "b24d8911fd75eed6915c7d1fa39f959180443d2ca5cab76a926c3891637b4c05",
+      "shared_bytes": 96897
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/density_C1.png",
+      "source_sha256": "96547061aef81efc1995cfadd3c13ab6ff0190dc9ad2c53ae878cb01e38f2cb7",
+      "decision": "excluded-pending-review",
+      "reason": "ReccoBeats 파생 밀도: 공개·재배포 조건 확인 전 보류",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/density_C2.png",
+      "source_sha256": "9e1bb08104c521878c7ed31dc1d685472781d670cfcf1fbd2440891b50896b50",
+      "decision": "excluded-pending-review",
+      "reason": "ReccoBeats 파생 밀도: 공개·재배포 조건 확인 전 보류",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/density_vs_recommendation.json",
+      "source_sha256": "0848ac52696851dfe9a8d09644f3b9bdf09aee5f038834da0971c824a5f97e6c",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/coordinate-distributions-20261020/density_vs_recommendation.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "A/C1/C2 목표 주변 수치 제외"
+      ],
+      "shared_sha256": "c355b2fa3c5f6cc5c3e4839c205859d24986bf91d94e75904d2317655fe99aa6",
+      "shared_bytes": 33552
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/input-verification.json",
+      "source_sha256": "ca65681fcc7cedc993e9b2c4b73c621f1ce71c3293f9174776a62f8ef578d8e0",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/coordinate-distributions-20261020/input-verification.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "비공개 입력 해시 맵 제외; 두 데이터 폴더 절대경로 상대화"
+      ],
+      "shared_sha256": "0fc0f24c943b2624f8634b42bd0747ffef13fc3b826b3defe0f4a9f44f7225bd",
+      "shared_bytes": 1054
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/render-verification.json",
+      "source_sha256": "839749d4a43db62b0c2f53a61633706fea79901922770e4f34425b977844baba",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/coordinate-distributions-20261020/render-verification.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "미공유 모델별 렌더 카운터 제외; 원본 실행 메타데이터만 유지"
+      ],
+      "shared_sha256": "e8553f87f4a39fdeccd02958fbff80625910e3bada58e9c373f1bae6dd871f1f",
+      "shared_bytes": 1083
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/scatter_A.png",
+      "source_sha256": "c9b97e4a92f57d18e5b27da57f8c8a9d9b59ed7655cc5ed319ab92b729ae996f",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/scatter_B1.png",
+      "source_sha256": "90cf3bbbc7e3edc77eab4813c7111547cdcf12cd5d89822908cbc73ce989a14e",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/scatter_B2.png",
+      "source_sha256": "7ac2236680ab6d227d37d31856f03cfe26eb6f9511232aec600268b0c6b79721",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/scatter_C1.png",
+      "source_sha256": "15da16914aa10a48a177420257204445d46714c9e0aa2aae115a2abd66040d04",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/scatter_C2.png",
+      "source_sha256": "90f8152d75ba96f6de13502c58bad4a4fe397838efa32e0cb3d2d3d0dd68bf75",
+      "decision": "excluded-pending-review",
+      "reason": "점별 산점도/산점도 포함 통합 이미지: 개별 원본 좌표 표시",
+      "destination": null
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/statistics.json",
+      "source_sha256": "e533506ea3cc5375b56da61c7b43279fd5cab85692d690ba67f9ff749470547a",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/coordinate-distributions-20261020/statistics.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "A/C1/C2 좌표 집계 제외"
+      ],
+      "shared_sha256": "d93122b1307aadd2c472c9474ce8924ec01a874d937ef3aab18a6865e6d2dc98",
+      "shared_bytes": 3773
+    },
+    {
+      "source": "src/music/.local/music-coordinate-visualization-20261020-v1/verification.json",
+      "source_sha256": "ce23d55815afbfea044d7f11fe27544f869da51c6adcfef2b004ff4859a1ab6c",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/coordinate-distributions-20261020/verification.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "공유 density 2개의 원본 PNG 해시만 유지; 원본 REPORT 해시 제외"
+      ],
+      "shared_sha256": "b34b4e38d9e5fd2148e9fa96ef832241b20cbc1840acbe39618414a7cd6c5ff4",
+      "shared_bytes": 1501
+    },
+    {
+      "source": "src/music/.local/music-model-comparison-20261020-v1/REPORT.md",
+      "source_sha256": "6f22ff1294cab334637a3a63fed2737c79dfea60d4a0be234e8854def46f6dd1",
+      "decision": "sanitized-excerpt",
+      "destination": "src/music/reports/model-comparison-20261020/REPORT.md",
+      "changes": [
+        "공유용 발췌 보고서로 재구성; 원본 전체 보고서와 구분"
+      ],
+      "shared_sha256": "927ea4ff94337b0e47b10076bfde60f5c370100f5162b0469b1c91f856d29d53",
+      "shared_bytes": 2800
+    },
+    {
+      "source": "src/music/.local/music-model-comparison-20261020-v1/protocol.json",
+      "source_sha256": "3b71c42e5ac19434b44e7a6dc3145b615c521c0c37e78afd457a6190faac4c88",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/model-comparison-20261020/protocol.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "실험 DB 절대경로를 저장소 상대경로로 변경; 파일은 비공개"
+      ],
+      "shared_sha256": "675d1beba08fd3b4791467215f49fa2eca6f939a61f322d9321a15a900648001",
+      "shared_bytes": 4824
+    },
+    {
+      "source": "src/music/.local/music-model-comparison-20261020-v1/result.json",
+      "source_sha256": "6eff9454e5f570a5b0de6a8280419b127de60db0900fe9674e1be0bd2e1656b2",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/model-comparison-20261020/result.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "A/C1/C2 수치·교차 모델 쌍·입력 해시 제외; B1/B2 집계만 발췌"
+      ],
+      "shared_sha256": "8e8d3b3c2a283635e45d8e766e150783995021e0efa0577ee709e92503111974",
+      "shared_bytes": 21812
+    },
+    {
+      "source": "src/music/.local/music-model-comparison-20261020-v1/verification.json",
+      "source_sha256": "93f9b380ce09cc4199dd989e34ba80e97f6430b644a87065acbefdc262b5e015",
+      "decision": "sanitized-aggregate-copy",
+      "destination": "src/music/reports/model-comparison-20261020/verification.json",
+      "changes": [
+        "공유 사본 식별정보 추가; 원본 검증 결과와 공유본 검사를 구분",
+        "비공개 상세 결과 및 정제 전 REPORT/protocol/result의 artifact 해시 맵 제외"
+      ],
+      "shared_sha256": "16293fcea243828b6d527eca6505a4ece010f792f123a5dde32b8f54325a6c98",
+      "shared_bytes": 865
+    }
+  ]
+}
