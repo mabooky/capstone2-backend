@@ -11,7 +11,6 @@ import { openCompactExperiment, MODEL_AXES, COMPACT_COLUMNS } from '../db/compac
 import { recommend } from '../algorithm/recommend.ts';
 
 const dataset = fileURLToPath(new URL('../data/experiment-v1/', import.meta.url));
-const source = fileURLToPath(new URL('../.local/music-experiment-20261020-v3/', import.meta.url));
 const optIn = { allowUnverifiedLocalExperiment: true };
 const request = (view = 'B1', changes = {}) => ({
   coordinateSpace: 'unit-interval-v1', view, valence: 0.5, arousal: 0.5, limit: 5, ...changes,
@@ -105,31 +104,178 @@ test('checksum corruption and verified promotion are rejected', async () => {
   }
 });
 
-test('all original PGlite fields and HTTP recommendation lists equal the packaged source', {
-  skip: process.env.RUN_LOCAL_MUSIC_HTTP_TESTS !== 'true',
-}, async t => {
-  // Optional legacy tools are not imported during clean-clone dataset-only tests.
-  const { openLocalExperiment } = await import('../db/query_local_experiment.mjs');
-  const { fingerprint } = await import('../db/export_compact_experiment.mjs');
-  const before = await fingerprint(source);
-  const reader = await openLocalExperiment(source, { ...optIn, readOnlyCopy: true });
-  const compact = await openCompactExperiment(dataset, optIn);
-  let oldHttp, newHttp;
-  try {
-    for (const model of Object.keys(MODEL_AXES)) await t.test(`${model}: all 27948 rows / 14 fields`, async () => {
-      assert.deepEqual((await compact.model(model)).rows, (await reader.model(model)).rows);
-    });
-    oldHttp = await server({ nodeEnv: 'development', enabled: true, source: 'pglite', experimentRoot: source });
-    newHttp = await server({ nodeEnv: 'development', enabled: true, source: 'dataset' });
-    for (const model of Object.keys(MODEL_AXES)) await t.test(`${model}: HTTP parity`, async () => {
-      for (const changes of [{}, { valence: 0.1, arousal: 0.9, limit: 20 }]) {
-        const body = request(model, changes);
-        const [oldResult, newResult] = await Promise.all([oldHttp.post(body), newHttp.post(body)]);
-        assert.equal(oldResult.status, 200); assert.deepEqual(newResult, oldResult);
-      }
-    });
-  } finally {
-    await oldHttp?.close(); await newHttp?.close(); await reader.close(); await compact.close();
-    assert.deepEqual(await fingerprint(source), before, 'Original PGlite/input files changed');
+
+// Captured from the dataset-only HTTP API at the archived baseline commit 6eb1f96.
+const regression = [
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "A",
+      "valence": 0.5,
+      "arousal": 0.5,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "56b27J3f8IgjauSAbBvA2o",
+      "0EPux2ELVyf2jxtpXGf3KH",
+      "43iKgGbmfqPLh3mxUlospI",
+      "58kmOPF7hFVLTVAu4argRe",
+      "0uEp9E98JB5awlA084uaIg"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "A",
+      "valence": 0.1,
+      "arousal": 0.9,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "7A3uaOpTtICqhAtwBbeaAB",
+      "326GKzFhapEAQ8BCTxORQE",
+      "3eZkW5bhQMp3KtcBJh4gDr",
+      "2Jq2v7eIbP4rbIn4Rce7kb",
+      "4t7qYHFuJkVs0LhYLIP6Oz"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "B1",
+      "valence": 0.5,
+      "arousal": 0.5,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "72FzPhpeCWhWo0z63wmWyU",
+      "7kNRIjtx99RfIHCvJKv52B",
+      "6MZIuGKyA1SZwH3oH9jvXJ",
+      "3ZJy7tB4oLWPxPAH101rPe",
+      "2OXHF0zVr2TSqhpm80PS1P"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "B1",
+      "valence": 0.1,
+      "arousal": 0.9,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "5IJbTPhcj0IjdzUaYqwe2I",
+      "22pGUXnkdIOCXtb0kIclnq",
+      "2SjpBcKifUxzgO3lG9eNm2",
+      "4inojfeUyfcmV313nsizsA",
+      "5Yg78W1IRkOBsHNMhT5TDh"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "B2",
+      "valence": 0.5,
+      "arousal": 0.5,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "2s95Iq50JtytE3JwaDSWQn",
+      "7vTCIwHvCT3zMmtYBo0uff",
+      "2cs4flC9FpTI6ngU7Y9HRG",
+      "4RD9ieX3yq8OLW5tlf1KLL",
+      "1APu9lSrXWUarvP61myILk"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "B2",
+      "valence": 0.1,
+      "arousal": 0.9,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "5IJbTPhcj0IjdzUaYqwe2I",
+      "22pGUXnkdIOCXtb0kIclnq",
+      "2SjpBcKifUxzgO3lG9eNm2",
+      "4inojfeUyfcmV313nsizsA",
+      "5Yg78W1IRkOBsHNMhT5TDh"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "C1",
+      "valence": 0.5,
+      "arousal": 0.5,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "6dhfqStWHETvJWNhhLO1Qc",
+      "698R7h4SU5zyNil1iReHAX",
+      "5M93fqN6b9HNmfQGmXlqdu",
+      "70xGLdhwkhoJiUBf4qRXEL",
+      "74gmXOjhwnW0VUiwnxCpmU"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "C1",
+      "valence": 0.1,
+      "arousal": 0.9,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "4UeTAzIPGeAEN9cBKE7asV",
+      "5MrtuuhGztBlbkU9hE21OO",
+      "74B6prL77fBbloaUY07yym",
+      "12R7Drkzv56ssX6wnuhH0X",
+      "6SeEZAbyE5mKQY1rw3ucav"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "C2",
+      "valence": 0.5,
+      "arousal": 0.5,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "6ODnAiJq47k5uREuFXE9BO",
+      "68lU6PxXnMBFLfBlq3cYxr",
+      "1R5mc9pkvt3ZZ7r8nnnVVR",
+      "2alSiZEFVvpWzkf3iKxGJt",
+      "3r2d31Ro92xXWSNGXH3a5q"
+    ]
+  },
+  {
+    "request": {
+      "coordinateSpace": "unit-interval-v1",
+      "view": "C2",
+      "valence": 0.1,
+      "arousal": 0.9,
+      "limit": 5
+    },
+    "spotifyIds": [
+      "5pgACnIvUvQ6ZXvuc2MM7l",
+      "1XBqW98bRzP5UB1REN8lpc",
+      "6qzrABvo4DnUiDlg3nuJsf",
+      "5LrXbJns8r44Chu2R9Tf7o",
+      "4bDHr5yOmdI2nmbWvBpPS2"
+    ]
   }
+];
+test('five-model ordered Spotify IDs retain the pre-streamlining baseline', async () => {
+  const reader = await openCompactExperiment(dataset, optIn);
+  try {
+    for (const { request, spotifyIds } of regression) {
+      const result = recommend((await reader.model(request.view)).rows, {
+        view: request.view, valence: request.valence * 2 - 1, arousal: request.arousal * 2 - 1, limit: request.limit,
+      });
+      assert.deepEqual(result.tracks.map(t => t.row.spotify_id), spotifyIds);
+    }
+  } finally { await reader.close(); }
 });

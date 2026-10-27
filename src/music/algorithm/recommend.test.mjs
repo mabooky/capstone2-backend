@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compareViews, recommend, VIEW_NAMES } from '../.local/algorithm-validation/build/recommend.js';
+import { compareViews, recommend, VIEW_NAMES } from './recommend.ts';
 
 const views = Object.keys(VIEW_NAMES);
 const versions = {

@@ -1,15 +1,12 @@
 import assert from 'node:assert/strict';
 import { test, before, after } from 'node:test';
-import { createRequire } from 'node:module';
-import { readFile, open, unlink } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { RecommendationRepository } from '../.local/api-validation/build/integration/repository.js';
-import { RecommendationService, handleRecommendation } from '../.local/api-validation/build/integration/service.js';
-import { toInternal, toExternal } from '../.local/api-validation/build/integration/dto.js';
-import { recommend } from '../.local/api-validation/build/algorithm/recommend.js';
+import { readFile } from 'node:fs/promises';
+import { RecommendationRepository } from './repository.ts';
+import { RecommendationService, handleRecommendation } from './service.ts';
+import { toInternal, toExternal } from './dto.ts';
+import { recommend } from '../algorithm/recommend.ts';
 
-const require = createRequire(new URL('../.local/sql-validation/package.json',import.meta.url));
-const {PGlite} = require('@electric-sql/pglite');
+import { PGlite } from '@electric-sql/pglite';
 const serviceFor = client => new RecommendationService(new RecommendationRepository(client));
 const request = (view='A',extra={}) => ({coordinateSpace:'unit-interval-v1',view,valence:0.5,arousal:0.5,...extra});
 const views=['A','B1','B2','C1','C2'];
@@ -184,22 +181,4 @@ test('repository itself enforces the VIEW allowlist',async()=>{
 test('pending duplicate source rows are not visible through any VIEW',async()=>{
   for(const view of views) assert.equal((await new RecommendationRepository(db).read(view)).rows.length,125);
   assert.equal((await db.query("SELECT count(*)::int n FROM music.song_sources WHERE match_status='pending'")).rows[0].n,2);
-});
-test('actual persistent MuSe database flows through all five adapters as valid empty results',async()=>{
-  const root=resolve('src/music/.local/muse-persistent/stage4-v1');
-  await readFile(resolve(root,'pgdata/PG_VERSION')); // Refuse to initialize a missing database.
-  const lockPath=resolve(root,'run.lock'),lock=await open(lockPath,'wx');
-  let actual;
-  try {
-    actual=new PGlite(resolve(root,'pgdata'));
-    await actual.exec('BEGIN READ ONLY');
-    for(const view of views) {
-      const r=await serviceFor(actual).recommend(request(view));
-      assert.equal(r.returnedCount,0); assert.equal(r.reason,'no-candidates');
-    }
-    for(const [table,n] of [['songs',0],['song_sources',90408],['emotion_scores',361632]])
-      assert.equal((await actual.query(`SELECT count(*)::int n FROM music.${table}`)).rows[0].n,n);
-    assert.equal((await actual.query("SELECT count(*)::int n FROM music.song_sources WHERE match_status<>'pending' OR song_id IS NOT NULL OR is_recommendation_source")).rows[0].n,0);
-    await actual.exec('ROLLBACK');
-  } finally {await actual?.close();await lock.close();await unlink(lockPath);}
 });

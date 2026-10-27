@@ -3,37 +3,30 @@ import { resolve } from 'node:path';
 import { recommend } from '../algorithm/recommend.js';
 import { experimentRows } from '../db/experiment_input.js';
 import { openCompactExperiment } from '../db/compact_experiment.js';
-import type { LocalExperimentReader } from '../db/query_local_experiment.mjs';
 import { InputError, parseInput } from './dto.js';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
-export const defaultExperimentRoot = resolve(repositoryRoot,
-  'src/music/.local/music-experiment-20261020-v3');
 export const defaultDatasetRoot = resolve(repositoryRoot, 'src/music/data/experiment-v1');
 
 export class ExperimentUnavailableError extends Error {}
+export class UnsupportedExperimentSourceError extends ExperimentUnavailableError {}
 
 /** Development only: never constructs RecommendationService or canonical songs. */
 export class DevExperimentService {
-  private opening: Promise<LocalExperimentReader> | undefined;
-  constructor(private readonly root = defaultDatasetRoot, private readonly source = 'dataset') {}
+  private opening: ReturnType<typeof openCompactExperiment> | undefined;
+  constructor(private readonly root = defaultDatasetRoot, private readonly source = 'dataset',
+    private readonly legacyRootConfigured = false) {}
 
-  private reader(): Promise<LocalExperimentReader> {
+  private reader(): ReturnType<typeof openCompactExperiment> {
     if (!this.opening) {
       this.opening = (async () => {
-        if (this.source === 'dataset') {
-          return openCompactExperiment(this.root, { allowUnverifiedLocalExperiment: true });
+        if (this.source !== 'dataset' || this.legacyRootConfigured) {
+          throw new UnsupportedExperimentSourceError('Only the packaged dataset source is supported');
         }
-        if (this.source !== 'pglite') throw new Error('Unknown experiment source');
-        // The existing .mjs tools and their ignored PGlite dependency live in the
-        // source checkout, including when running a compiled development server.
-        const moduleUrl = new URL('src/music/db/query_local_experiment.mjs',
-          new URL('../../../', import.meta.url));
-        const module = await import(moduleUrl.href) as typeof import('../db/query_local_experiment.mjs');
-        return module.openLocalExperiment(this.root,
-          { allowUnverifiedLocalExperiment: true, readOnlyCopy: true });
+        return openCompactExperiment(this.root, { allowUnverifiedLocalExperiment: true });
       })().catch(cause => {
         this.opening = undefined;
+        if (cause instanceof UnsupportedExperimentSourceError) throw cause;
         throw new ExperimentUnavailableError('Local experiment unavailable', { cause });
       });
     }
@@ -50,7 +43,10 @@ export class DevExperimentService {
     const request = parseInput(input);
     let envelope;
     try { envelope = await (await this.reader()).model(request.view); }
-    catch (cause) { throw new ExperimentUnavailableError('Local experiment unavailable', { cause }); }
+    catch (cause) {
+      if (cause instanceof ExperimentUnavailableError) throw cause;
+      throw new ExperimentUnavailableError('Local experiment unavailable', { cause });
+    }
     const rows = experimentRows(envelope, { allowUnverifiedLocalExperiment: true });
     const result = recommend(rows, request);
     return {

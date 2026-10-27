@@ -1,7 +1,12 @@
 # 출처·변경 표시·공유 경계
 
+이 문서는 기존 `reports/SOURCES.md`의 출처와 공유 검토 이력을 보존하여 이동했다.
+아래의 “이 폴더”, 선별·보류 설명은 당시 보고서 공유본에 관한 역사적 기록이다.
+해당 보고서 원형은 `archive/music-research-20261027`의 `src/music/reports/`에 있다.
+현재 승인된 데이터셋의 범위와 조건은 [데이터셋 README](data/experiment-v1/README.md)를 따른다.
+
 2026-10-27 추가: 사용자에게서 음악 데이터 공유 권한 확보와 GitHub 포함 지시를 받은
-축소 실험 데이터셋은 [data/experiment-v1](../data/experiment-v1/README.md)에 별도로
+축소 실험 데이터셋은 [data/experiment-v1](data/experiment-v1/README.md)에 별도로
 제공한다. 해당 데이터셋의 출처·권한 기록을 따른다. 아래 내용은 기존 보고서 공유본의
 선별·보류 이력이며 원본 DB·수집 자료의 일괄 공개를 허용하는 변경은 아니다.
 

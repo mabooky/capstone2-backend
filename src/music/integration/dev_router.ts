@@ -1,7 +1,7 @@
 import express from 'express';
 import { InputError } from './dto.js';
 import { DevExperimentService, ExperimentUnavailableError,
-  defaultDatasetRoot, defaultExperimentRoot } from './dev_experiment_service.js';
+  defaultDatasetRoot, UnsupportedExperimentSourceError } from './dev_experiment_service.js';
 
 export interface DevMusicOptions {
   nodeEnv?: string | undefined;
@@ -14,11 +14,9 @@ export interface DevMusicOptions {
 export function createDevMusicRouter(options: DevMusicOptions = {}) {
   const router = express.Router();
   const enabled = options.nodeEnv === 'development' && options.enabled === true;
-  // No file access or PGlite import occurs when the route is disabled.
-  // Preserve existing explicit experimentRoot callers; otherwise use the shared dataset.
-  const source = options.source ?? (options.experimentRoot ? 'pglite' : 'dataset');
-  const root = source === 'pglite' ? options.experimentRoot ?? defaultExperimentRoot : options.datasetRoot ?? defaultDatasetRoot;
-  const service = enabled ? new DevExperimentService(root, source) : undefined;
+  // Disabled routes never load data. Legacy options remain only to reject them explicitly.
+  const service = enabled ? new DevExperimentService(options.datasetRoot ?? defaultDatasetRoot,
+    options.source ?? 'dataset', options.experimentRoot !== undefined) : undefined;
   router.post('/recommendations', async (req, res) => {
     if (!service) { res.sendStatus(404); return; }
     res.setHeader('Cache-Control', 'no-store');
@@ -26,9 +24,12 @@ export function createDevMusicRouter(options: DevMusicOptions = {}) {
     catch (error) {
       if (error instanceof InputError) {
         res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid recommendation request' } });
+      } else if (error instanceof UnsupportedExperimentSourceError) {
+        res.status(503).json({ error: { code: 'UNSUPPORTED_EXPERIMENT_SOURCE',
+          message: 'Only dataset is supported; remove MUSIC_EXPERIMENT_ROOT and use MUSIC_DATASET_ROOT' } });
       } else if (error instanceof ExperimentUnavailableError) {
         res.status(503).json({ error: { code: 'EXPERIMENT_UNAVAILABLE',
-          message: 'Experiment dataset, DB, manifest or runtime is missing or invalid' } });
+          message: 'Experiment dataset or manifest is missing or invalid' } });
       } else {
         res.status(500).json({ error: { code: 'EXPERIMENT_DATA_INVALID',
           message: 'Invalid local experiment data' } });

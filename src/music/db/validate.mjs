@@ -1,11 +1,9 @@
 // Only an isolated in-memory PostgreSQL engine; no URL/credentials/network DB.
-// Install test dependency under ignored src/music/.local/sql-validation first.
+// Uses the normal devDependency and synthetic fixtures only.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
+import { PGlite } from '@electric-sql/pglite';
 
-const require = createRequire(new URL('../.local/sql-validation/package.json', import.meta.url));
-const { PGlite } = require('@electric-sql/pglite');
 const db = new PGlite();
 let checks = 0;
 const eq = (a, b) => { assert.deepEqual(a, b); checks++; };

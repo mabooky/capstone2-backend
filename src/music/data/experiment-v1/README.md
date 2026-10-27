@@ -57,40 +57,17 @@ source ID/version, 원본 점수, 정규화 버전·설정은 `compact_experimen
 원본 CSV, DB/WAL, SQLite 체크포인트, 응답 본문, 제목·아티스트·이미지·인증정보는
 포함하지 않는다. `.local/` 원본과 과거 연구 산출물의 기존 보관 규칙은 별도다.
 
-## 개발용 API 및 검증
+## 실행과 검증
 
-기존 개발용 API는 기본으로 이 폴더를 사용한다. 개발 환경과 명시 opt-in은 계속 필요하다.
+개발용 API는 기본으로 이 데이터셋을 사용한다. 설치·서버 실행·HTTP 요청·테스트 명령은
+[음악 모듈 README](../../README.md)를 따른다. `.local/`이나 파일 DB는 필요 없다.
+`MUSIC_EXPERIMENT_SOURCE=pglite` 및 `MUSIC_EXPERIMENT_ROOT`는 더 이상 지원하지 않으며
+개발 API에서 명시적 503을 반환한다. 다른 데이터셋 위치는 `MUSIC_DATASET_ROOT`로 지정한다.
+운영 환경에서는 API가 비활성화된다. 빌드 출력만 배포할 때는 이 데이터 폴더도 함께 제공한다.
 
-```powershell
-# 새 clone의 저장소 루트에서:
-corepack pnpm install --frozen-lockfile
-$env:NODE_ENV = 'development'
-$env:ENABLE_DEV_MUSIC_RECOMMENDATIONS = 'true'
-$env:MUSIC_EXPERIMENT_SOURCE = 'dataset'
-corepack pnpm dev
-```
-
-기존 PGlite 방식과 비교하려면 MUSIC_EXPERIMENT_SOURCE=pglite를 사용한다.
-MUSIC_DATASET_ROOT는 다른 축소 데이터셋 폴더, MUSIC_EXPERIMENT_ROOT는 기존
-PGlite 실험 폴더를 지정한다. 오류 시 다른 데이터 소스로 자동 fallback하지 않는다.
-HTTP 경로·요청·응답과 운영 환경의 404 동작은 유지한다.
-tsc는 데이터 파일을 dist로 복사하지 않는다. 빌드 출력만 별도 위치로 옮길 경우에는
-이 데이터 폴더도 함께 제공하고 MUSIC_DATASET_ROOT로 실제 위치를 지정한다.
-
-```powershell
-corepack pnpm build
-node --import tsx --test src/music/integration/compact_experiment.test.mjs
-# 기존 비공개 PGlite 입력이 있는 환경에서만:
-$env:RUN_LOCAL_MUSIC_HTTP_TESTS = 'true'
-node --import tsx --test --test-concurrency=1 src/music/integration/compact_experiment.test.mjs src/music/integration/dev_recommendations.test.mjs
-```
-
-새 clone에서 첫 테스트는 PGlite나 `.local/` 없이 실행할 수 있다. 두 번째는 모든
-14필드의 전곡 일치, 5모델의 중앙·비대칭 목표 HTTP 결과 일치, 원본 해시 불변을 검사한다.
-
-재생성 도구는 기존 대상 폴더를 덮어쓰지 않는다. 원본 DB의 임시 사본을 READ ONLY로
-조회하며 원본에는 쓰지 않는다. 재생성이 필요하면 별도 새 버전 폴더를 지정한다.
-
-```powershell
-node --import tsx src/music/db/export_compact_experiment.mjs src/music/.local/music-experiment-20261020-v3 src/music/data/experiment-v2
-```
+데이터셋 재생성 도구와 기존 PGlite 전곡 비교 테스트는
+`archive/music-research-20261027` 브랜치의 `src/music/db/export_compact_experiment.mjs` 및
+`src/music/integration/compact_experiment.test.mjs`에 원형 보존한다.
+해당 브랜치의 과거 실행 명령은 개발 브랜치의 검증 명령이 아니다.
+원본·백업 DB를 직접 엔진으로 열지 않으며 재생성은 별도 승인된 격리 사본에서만 검토한다.
+현재 개발 브랜치는 공유 데이터셋의 해시·건수·14필드·5모델 추천 회귀를 독립 검증한다.

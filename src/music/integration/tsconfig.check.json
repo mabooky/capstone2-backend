@@ -2,11 +2,13 @@
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
     "rootDir": "..",
-    "outDir": "../.local/api-validation/build",
-    "types": [],
-    "noEmitOnError": true,
+    "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["*.ts"]
+  "include": [
+    "../algorithm/*.ts",
+    "../db/*.ts",
+    "*.ts"
+  ]
 }
