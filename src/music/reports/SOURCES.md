@@ -1,5 +1,10 @@
 # 출처·변경 표시·공유 경계
 
+2026-10-27 추가: 사용자에게서 음악 데이터 공유 권한 확보와 GitHub 포함 지시를 받은
+축소 실험 데이터셋은 [data/experiment-v1](../data/experiment-v1/README.md)에 별도로
+제공한다. 해당 데이터셋의 출처·권한 기록을 따른다. 아래 내용은 기존 보고서 공유본의
+선별·보류 이력이며 원본 DB·수집 자료의 일괄 공개를 허용하는 변경은 아니다.
+
 ## MuSe
 
 - 자료: **MuSe: The Musical Sentiment Dataset**, Christopher Akiki, Manuel Burghardt.

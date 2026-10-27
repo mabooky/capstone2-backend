@@ -1,5 +1,83 @@
 # 추천 DB·API 연동 모듈 (후속 5단계)
 
+## 개발용 실험 HTTP API (2026-10-27)
+
+### 축소 데이터셋 기본 사용
+
+공유 권한 확보를 확인한 사용자 지시에 따라 `../data/experiment-v1/`에 27,948곡
+축소 데이터셋을 추가했다. 기본 데이터 소스는 이제 이 폴더다. PGlite와 `.local/`이
+없는 clone에서도 개발용 API와 데이터셋 테스트가 동작한다.
+원본 점수·좌표는 문자열로 유지하며, 6개 축과 곡별 출처로 기존 14필드를 복원한다.
+출처·사용 조건과 파일 형식은 [데이터셋 안내](../data/experiment-v1/README.md)를 따른다.
+
+- `MUSIC_EXPERIMENT_SOURCE=dataset` (기본): 읽기 전용 파일 어댑터. 선택적 MUSIC_DATASET_ROOT.
+- `MUSIC_EXPERIMENT_SOURCE=pglite`: 기존 읽기 전용 PGlite 사본 방식. 선택적 MUSIC_EXPERIMENT_ROOT.
+- 이전과 같이 MUSIC_EXPERIMENT_ROOT만 지정한 경우에는 PGlite 방식을 유지한다.
+- 누락·해시 불일치 시 503이며 다른 소스로 자동 대체하지 않는다.
+- 두 방식 모두 개발 환경·활성화 플래그를 요구하고, 운영 서비스·verified 상태와 분리한다.
+
+```powershell
+node --import tsx --test src/music/integration/compact_experiment.test.mjs
+```
+
+아래 PGlite 실행/의존성 설명은 source=pglite에 적용된다. 실제 ID를 코드 예시에
+하드코딩하지 않으며, 승인된 실제 데이터는 data/experiment-v1에만 묶어서 제공한다.
+
+`POST /api/dev/music/recommendations`를 추가했다. **NODE_ENV=development와
+ENABLE_DEV_MUSIC_RECOMMENDATIONS=true가 모두 설정된 경우에만** 사용할 수 있다.
+production, test, 미설정 환경 또는 활성화 플래그가 없으면 404다.
+
+```powershell
+corepack pnpm install --frozen-lockfile
+$env:NODE_ENV = 'development'
+$env:ENABLE_DEV_MUSIC_RECOMMENDATIONS = 'true'
+corepack pnpm dev
+```
+
+요청 예시:
+
+```json
+{"coordinateSpace":"unit-interval-v1","view":"B1","valence":0.5,"arousal":0.5,"limit":5}
+```
+
+다섯 필드가 모두 필요하다. VIEW는 A/B1/B2/C1/C2, 좌표는 숫자 0~1,
+limit는 정수 0~100이다. 추가 필드와 실험 ID 제외 목록은 받지 않는다.
+응답은 `{coordinateSpace,view,returnedCount,spotifyIds,reason,experimental:true,
+verified:false,canonicalSongIds:false,idNamespace,datasetId}`다. 곡명·아티스트·이미지나
+가짜 메타데이터는 반환하지 않는다. 실제 ID 예시는 Git 문서·테스트에 저장하지 않는다.
+
+`dev_experiment_service.ts`는 dto의 parseInput, experimentRows, recommend와 기존
+query_local_experiment.mjs를 재사용한다. 정식 메타데이터를 요구하는 운영용
+RecommendationService/RecommendationRepository에는 실험 행을 전달하지 않는다.
+
+PGlite 방식의 기본 데이터는 `src/music/.local/music-experiment-20261020-v3`이며,
+MUSIC_EXPERIMENT_ROOT로 music/.local 아래의 다른 승인된 실험 폴더를 지정할 수 있다.
+manifest, snapshot/schema-manifest.json, snapshot/pgdata/PG_VERSION 및 기존 DB가 필요하다.
+로컬 PGlite 의존성은 기존 `.local/sql-validation`을 사용한다. 입력/런타임 누락·손상은
+503 EXPERIMENT_UNAVAILABLE, 잘못된 요청은 400 INVALID_INPUT이다.
+
+최초 유효 요청에서 원본 pgdata의 임시 사본을 만들고 READ ONLY 트랜잭션으로 조회한다.
+DB 생성·migration·원본 잠금 파일 생성·verified 전환·Spotify 호출은 하지 않는다.
+같은 프로세스는 같은 사본을 재사용하므로 원본 갱신 반영은 서버 재시작 후 이뤄진다.
+원본 DB에 쓰는 다른 프로세스가 없는 상태에서 실행한다. 정상 서버 종료 시 사본을
+정리한다. 강제 종료 시 OS 임시 폴더에 사본이 남을 수 있다.
+개발용 빌드 실행도 소스 체크아웃과 ignored 로컬 입력/의존성이 필요하다.
+
+HTTP 검증(실제 데이터 검사는 명시적으로 활성화):
+
+```powershell
+corepack pnpm build
+$env:RUN_LOCAL_MUSIC_HTTP_TESTS = 'true'
+node --import tsx --test src/music/integration/dev_recommendations.test.mjs
+```
+
+localhost의 실제 Express 서버로 요청한다. 5모델의 결과를 기존 모델별 JSONL의 직접 추천과
+대조하고 입력 오류, 누락 파일/DB, production 비활성화, 기존 GET, 동시 요청 및
+원본 실험 디렉터리 전체 SHA-256 불변을 검증한다. 이 결과는 Spotify의 ID 유효성,
+실제 녹음 매칭 또는 재생 가능성 검증을 뜻하지 않는다.
+
+아래 내용은 기존 **운영용 준비 모듈**의 계약·검증 이력이다.
+
 실제 서버/라우터를 실행하거나 기존 Track을 변경하지 않는 준비 모듈이다. 외부 API/DB 접속·실제 source 상태 갱신·수집 기능은 없다. DB 클라이언트는 호출자가 주입한다.
 
 - `repository.ts`: 허용 목록의 VIEW 5종을 SELECT하고 기존 14열과 표시 메타데이터를 분리한다. bigint/numeric은 SQL에서 text로 받아 정밀도를 유지한다. 같은 SELECT에서 songs와 검증·선택된 ReccoBeats ID를 결합한다. 후보에 조기 LIMIT을 적용하지 않고 제외 ID는 SQL 파라미터로 전달한다.

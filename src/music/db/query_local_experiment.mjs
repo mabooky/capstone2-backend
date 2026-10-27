@@ -1,12 +1,37 @@
 // Opt-in query boundary for a prepared, unverified LOCAL experiment snapshot.
 import assert from 'node:assert/strict';
-import { readFile, writeFile, realpath } from 'node:fs/promises';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { readFile, writeFile, realpath, cp, mkdtemp, rm } from 'node:fs/promises';
+import { resolve, relative, isAbsolute, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { entries } from './load_muse_batches.mjs';
 import { openDatabase, q, music, counts, viewCounts, shaFile } from './persistent_muse.mjs';
 
 const MODELS=['A','B1','B2','C1','C2'];
+// Opening file-backed PostgreSQL can write recovery/checkpoint files even when
+// queries are READ ONLY. Development HTTP callers therefore use a private copy.
+async function openReadOnlyCopy(pgdata) {
+    const temporary=await mkdtemp(join(tmpdir(),'music-dev-experiment-'));
+    const cleanup=async()=>{
+        const child=relative(resolve(tmpdir()),resolve(temporary));
+        assert.ok(child.startsWith('music-dev-experiment-') && !child.includes('..') && !isAbsolute(child));
+        await rm(temporary,{recursive:true,force:true});
+    };
+    let db;
+    try {
+        await cp(pgdata,join(temporary,'pgdata'),{recursive:true});
+        const require=createRequire(new URL('../.local/sql-validation/package.json',import.meta.url));
+        const {PGlite}=require('@electric-sql/pglite');
+        db=new PGlite(join(temporary,'pgdata'));
+        await db.exec('BEGIN READ ONLY');
+        assert.equal((await q(db,'SHOW transaction_read_only'))[0].transaction_read_only,'on');
+        return {db,cleanup};
+    } catch(error) {
+        try { await db?.close(); } finally { await cleanup(); }
+        throw error;
+    }
+}
 export async function openLocalExperiment(root,options) {
     if(options?.allowUnverifiedLocalExperiment!==true) throw new TypeError('Explicit local experiment opt-in required');
     root=await realpath(resolve(root));
@@ -21,9 +46,14 @@ export async function openLocalExperiment(root,options) {
     assert.equal(manifest.id_namespace,'music_experiment.common_songs');
     assert.equal(await shaFile(new URL('./004_local_experiment.sql',import.meta.url)),manifest.schema_sha256);
     const schema=JSON.parse(await readFile(resolve(snapshot,'schema-manifest.json'),'utf8'));
-    const db=await openDatabase(snapshot,schema);
-    try { await db.exec('BEGIN READ ONLY'); }
-    catch(error) { await db.close(); throw error; }
+    // Require existing data before opening: never initialize an absent DB.
+    if(options.readOnlyCopy) await readFile(resolve(pgdata,'PG_VERSION'),'utf8');
+    const copy=options.readOnlyCopy ? await openReadOnlyCopy(pgdata) : undefined;
+    const db=copy?.db ?? await openDatabase(snapshot,schema);
+    if(!copy) {
+        try { await db.exec('BEGIN READ ONLY'); }
+        catch(error) { await db.close(); throw error; }
+    }
     return {
         manifest,db,
         async model(model) {
@@ -37,7 +67,10 @@ export async function openLocalExperiment(root,options) {
             return {dataset_kind:manifest.dataset_kind,dataset_id:manifest.dataset_id,
                 id_namespace:manifest.id_namespace,canonical_song_ids:false,verified:false,model,rows};
         },
-        async close() { try { await db.exec('ROLLBACK'); } finally { await db.close(); } },
+        async close() {
+            try { await db.exec('ROLLBACK'); }
+            finally { try { await db.close(); } finally { await copy?.cleanup(); } }
+        },
     };
 }
 

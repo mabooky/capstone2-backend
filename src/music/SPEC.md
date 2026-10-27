@@ -1,5 +1,28 @@
 # 음악 DB·추천 상세 설계
 
+## 공유용 축소 실험 데이터셋 v1 (2026-10-27)
+
+사용자가 공유 권한 확보와 GitHub 포함을 명시한 이번 요청에 한해
+`data/experiment-v1`의 실제 곡 ID·좌표 공유를 허용한다. 과거 공유 보류 기록과 구별하며
+원본 DB/CSV/체크포인트는 계속 제외한다. 권한 확인의 범위와 제공되지 않은 허가 문서는
+해당 폴더 README 및 manifest에 명시한다. 추가 오픈 라이선스를 추정하지 않는다.
+
+- 27,948행의 고정 15열 문자열 배열 JSONL: 실험 ID·Spotify ID, 두 제공자 source ID,
+  곡별 ReccoBeats source version, 원본 축 4개, 고유 정규화 축 6개.
+- 동일한 MuSe source version과 정규화 템플릿 6개는 별도 normalization.json으로 분리한다.
+- A/B1/B2/C1/C2를 기존 14필드로 복원하며 소수 반올림·공식 변경·검증 상태 변경은 없다.
+- manifest는 바이트 수/SHA-256, 실험 namespace/미검증 상태, 출처·권한 기록을 보존한다.
+- 개발용 API의 기본 소스는 dataset이다. 명시 source=pglite 또는 기존 experimentRoot
+  설정은 레거시 조회를 유지한다. 운영 서비스 및 production 차단은 유지한다.
+
+## 개발용 실험 API 계약 (2026-10-27)
+
+- `POST /api/dev/music/recommendations`: NODE_ENV=development 및 ENABLE_DEV_MUSIC_RECOMMENDATIONS=true에서만 제공, 나머지는 404.
+- 입력은 coordinateSpace=unit-interval-v1, view=A/B1/B2/C1/C2, valence/arousal=0~1 숫자, limit=0~100 정수의 필수 5필드다.
+- 응답은 view/returnedCount/spotifyIds/reason과 coordinateSpace, experimental=true, verified=false, canonicalSongIds=false, idNamespace/datasetId를 포함한다. 메타데이터와 운영 songId를 만들지 않는다.
+- 기존 실험 VIEW를 임시 DB 사본의 READ ONLY 트랜잭션에서 조회한다. 원본 DB·서비스 VIEW·검증 상태는 변경하지 않는다. 요청 오류 400, 데이터/런타임 누락 503, 잘못된 추천 데이터 500.
+- 운영 RecommendationService와 분리한 DevExperimentService를 사용한다. 구체적인 실행·요청·테스트 안내는 integration/README.md를 따른다.
+
 ## Git 공유 범위 (2026-10-20)
 
 공유 문서는 구현 계약·모델 정의·합성 테스트 절차와 MuSe 집계만 제공한다. 실제 Spotify ID·개별 곡 식별/좌표·외부 태그 가중치, 공개 조건이 미확정인 ReccoBeats 실측 분포·성공률·추천 수치는 제외했다. 생략은 원본 연구 결과의 변경이 아니다. .local 원본과 실험 결과는 그대로 보존한다.

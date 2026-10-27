@@ -1,6 +1,58 @@
 # 현재 상태
 
-갱신일: 2026-10-20
+갱신일: 2026-10-27
+
+## Commit/push 직전 독립 실행 검증 — PASS
+
+- 사용자가 feature/music-db의 최종 검증 후 commit 및 일반 push를 명시적으로 승인했다.
+  원격과 HEAD가 같은 상태에서 업로드 후보가 예상한 21개와 정확히 일치함을 확인했다.
+- Git 공유 파일 116개만 복사한 새 임시 작업 폴더에서 frozen lockfile로 의존성 104개를
+  설치하고 빌드했다. 기존 node_modules/dist/.local은 복사하지 않았으며,
+  해당 환경에 .local 및 PGlite 패키지가 없음을 실행 시 확인했다.
+- 공개 파일 기반 테스트는 14개 PASS, 기존 PGlite 원본이 필요한 2개는 의도적으로 SKIP.
+  별도 컴파일 앱 HTTP 검증에서 기본 데이터 소스로 5모델 × 2목표=10개 추천 목록이
+  원본 모델 JSONL의 해시를 확인한 직접 추천 결과와 일치했다. 기존 B1 Top-5도 일치했다.
+- catalog/tracks의 전체 예시 응답 회귀, health, 잘못된 입력 400, production에서
+  활성화 플래그를 켜도 5모델 모두 404, opt-in 미설정 차단을 독립 환경에서 확인했다.
+- 곡 수 27,948개·고유 Spotify ID 27,948개·15개 문자열 컬럼과 payload의 바이트 수/SHA-256을
+  재검증했다. 원본 .local DB는 열거나 변경하지 않았고 원본 모델 JSONL은 읽기만 했다.
+- 출처/사용 조건 기록을 보존했다. 추천 알고리즘·정규화 SQL·기존 라우터·공용 의존성의
+  변경은 없으며 제외 대상 DB/체크포인트/인증정보/빌드 산출물은 업로드하지 않는다.
+
+## 승인된 축소 추천 데이터셋 v1 — 완료
+
+- 사용자가 공유 권한 확보와 GitHub 포함을 확인했다. `data/experiment-v1`에 songs.jsonl,
+  normalization.json, manifest.json, README 및 LF 고정 .gitattributes를 생성했다.
+  허가 원문·추가 라이선스 조건은 미제공 상태로 명시하고 임의 오픈 라이선스는 부여하지 않았다.
+- 27,948곡을 15개 문자열 필드로 저장한다. 고유 정규화 축 6개·원본 축 4개·실험/Spotify/source ID·
+  곡별 ReccoBeats source version과 공통 MuSe 버전을 보존한다. 데이터는 8,386,373 bytes,
+  정규화 설정은 2,928 bytes이며 원본 점수/좌표를 Number로 다시 저장하거나 정규화하지 않았다.
+- 기존 PGlite VIEW의 5모델 × 27,948행=139,740행 전체 14필드와 생성·재조회 결과가 일치했다.
+  원본 실험 디렉터리 파일 전체 SHA-256은 생성 및 HTTP 비교 전후 불변이다.
+- 개발용 API는 기본 dataset 파일 어댑터를 사용하며 명시 source=pglite는 기존 방식을 유지한다.
+  운영 서비스·기존 GET·production 차단·미검증 상태는 유지하고 데이터 소스 오류를 fallback하지 않는다.
+- 빌드·엄격 타입 검사 PASS. 신규 데이터셋 및 기존 HTTP 검사 34개 모두 PASS:
+  5모델의 전곡 필드 일치, 각 모델 2요청의 두 방식 HTTP 응답 전체 일치, checksum 손상 거절,
+  verified=true 거절, 누락 파일 503, 운영 404와 기존 API 회귀를 포함한다.
+- 원본 CSV/DB/체크포인트·응답 본문·추가 메타데이터·인증정보는 공유하지 않는다.
+  실제 데이터의 Git 포함은 이번 승인된 data/experiment-v1만 예외이며 .local 제외는 유지한다.
+  Spotify 호출·재수집·DB migration·원본 쓰기·검증 상태 변경·commit/push는 수행하지 않았다.
+
+## GitHub 업로드 전 최종 검토 — 완료
+
+- `.gitignore`에 dist, TypeScript 증분 빌드 산출물, 루트 로컬 환경파일 제외를 추가했다. 기존 파일은 삭제하지 않았다. node_modules와 음악 .local의 기존 제외 규칙도 확인했다.
+- 기본 앱의 실제 환경변수 설정에서도 production+활성화 플래그가 404인지 검사하는 회귀 테스트를 보강했다. 빌드와 HTTP 검사 13개 모두 PASS, 컴파일된 앱의 B1 Top-5도 이전 결과와 정확히 일치했다. HTTP 검사 전후 원본 실험 파일 전체 SHA-256 불변을 확인했다.
+- 업로드 후보 12개 파일에서 실제 Spotify ID 리터럴, 로컬 절대경로, 주요 비밀키·인증정보 패턴이 발견되지 않았다. 제외 대상의 Git 추적은 0개이며 기존 라우터·타입·추천·정규화·공용 의존성은 변경하지 않았다.
+- 최종 후보는 신규 5개와 수정 7개다. 스테이징·commit·push는 수행하지 않았다. 비공개 로컬 입력과 PGlite 의존성이 없는 환경에서는 실제 데이터 테스트가 불가능하며, 개발용 API는 누락 시 503을 반환한다.
+
+## 개발용 실험 추천 HTTP 통합 — 완료
+
+- `/api/dev/music/recommendations` 추가. development와 명시 활성화 플래그를 모두 요구하며 production/test/미설정 환경은 404다. 기존 catalog/tracks는 유지한다.
+- 기존 DTO·추천·실험 경계와 조회기를 재사용한다. 원본 DB의 임시 사본을 READ ONLY로 조회하며 Spotify ID 목록과 실험 표시만 반환한다. 운영 RecommendationService에 실험 ID/가짜 메타데이터를 전달하지 않는다.
+- `corepack pnpm install --frozen-lockfile` 및 `corepack pnpm build` 성공. 공용 package/잠금 파일 변경 없음. 엄격 integration 타입 검사도 통과했다.
+- 실제 localhost HTTP 검사 12개 PASS: 5모델 직접 추천 대조, 잘못된 입력/누락 DB·manifest, 운영 비활성화, 기존 GET, 동시 요청과 전체 원본 실험 파일 SHA-256 불변. 컴파일된 앱의 별도 HTTP B1 요청도 이전 로컬 Top-5와 일치했다. 실제 ID는 추적 파일에 기록하지 않았다.
+- 기존 추천 22개와 합성 SQL/정규화/VIEW 검사 67개 PASS. Spotify 호출·재수집·운영 DB 적재·원본 DB 쓰기·verified 전환·commit/push 없음.
+- 실행/계약은 integration/README.md를 따른다. 정식 운영 전환에는 이용 조건·원본별 매칭 검증, canonical songs/메타데이터, PostgreSQL 연결, 매장 인증·대기열·프런트엔드 계약을 별도 확정해야 한다.
 
 ## Git 공유 문서 정제
 

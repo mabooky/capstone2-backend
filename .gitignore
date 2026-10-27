@@ -1,5 +1,12 @@
 node_modules
 
+# Generated build output and local environment settings
+/dist/
+*.tsbuildinfo
+/.env
+/.env.*
+!/.env.example
+
 # Music source data, local analysis, and credentials
 /src/music/.local/
 /src/music/**/__pycache__/
