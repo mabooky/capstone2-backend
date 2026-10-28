@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ApiError } from './errors.js';
 import type { Library } from './library.js';
 import type { RequestStatus, Track, TrackWithStatus } from './models/track.js';
@@ -50,6 +51,8 @@ export class Store {
     private readonly playedAt = new Map<string, number>();
     /** 다음에 만들 대기열 항목의 번호입니다. queueId는 q1, q2, ...로 매장 안에서 올라갑니다. */
     private nextQueueNumber = 1;
+    /** 현재 유효한 관리자 토큰입니다. 매장당 하나만 유지하므로 새로 로그인하면 이전 토큰은 무효가 됩니다. */
+    private adminToken: string | null = null;
 
     constructor(private readonly library: Library, options: StoreOptions) {
         this.password = options.password;
@@ -57,6 +60,55 @@ export class Store {
         this.now = options.now ?? Date.now;
         this.catalog = library.nearest(this.mood.valence, this.mood.arousal, this.mood.n);
         this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
+    }
+
+    /** POST /admin/login: 비밀번호가 맞으면 새 토큰을 발급하고, 이전에 발급한 토큰은 무효로 만듭니다. */
+    login(password: string): string {
+        if (password !== this.password) {
+            throw new ApiError(401, 'INVALID_CREDENTIALS', '비밀번호가 올바르지 않습니다.');
+        }
+        this.adminToken = randomUUID();
+        return this.adminToken;
+    }
+
+    /** 현재 유효한 관리자 토큰인지 확인합니다. */
+    isAdminToken(token: string): boolean {
+        return this.adminToken !== null && token === this.adminToken;
+    }
+
+    /**
+     * PUT /admin/mood: 기준점을 통째로 교체하고 새 카탈로그를 돌려줍니다.
+     * 이미 대기열에 들어간 곡과 재생 기록은 그대로 유지합니다.
+     */
+    setMood(valence: number, arousal: number, n: number): TrackWithStatus[] {
+        if (!(valence >= -1 && valence <= 1) || !(arousal >= -1 && arousal <= 1)) {
+            throw new ApiError(400, 'INVALID_INPUT', 'valence와 arousal은 -1 이상 1 이하여야 합니다.');
+        }
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+            throw new ApiError(400, 'INVALID_INPUT', 'n은 1 이상 100 이하의 정수여야 합니다.');
+        }
+        this.mood = { valence, arousal, n };
+        this.catalog = this.library.nearest(valence, arousal, n);
+        this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
+        return this.getCatalog();
+    }
+
+    /** GET /admin/mood/preview: 기준점을 바꾸지 않고, 해당 좌표에서 가까운 곡을 미리 조회합니다. */
+    getPreview(valence: number, arousal: number, n: number): Track[] {
+        if (!(valence >= -1 && valence <= 1) || !(arousal >= -1 && arousal <= 1)) {
+            throw new ApiError(400, 'INVALID_INPUT', 'valence와 arousal은 -1 이상 1 이하여야 합니다.');
+        }
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+            throw new ApiError(400, 'INVALID_INPUT', 'n은 1 이상 100 이하의 정수여야 합니다.');
+        }
+        return this.library.nearest(valence, arousal, n);
+    }
+
+    /** DELETE /admin/queue/:queueId: 대기열에서 곡을 제거합니다. 재생된 것이 아니므로 곡 쿨타임은 적용하지 않습니다. */
+    removeQueueItem(queueId: string): void {
+        const index = this.queue.findIndex(entry => entry.queueId === queueId);
+        if (index === -1) throw new ApiError(404, 'QUEUE_ITEM_NOT_FOUND', '존재하지 않는 대기열 항목입니다.');
+        this.queue.splice(index, 1);
     }
 
     getMood(): Mood {
