@@ -2,11 +2,12 @@
 // GET /v1/track?ids=... 는 인증이 필요 없고 한 번에 최대 40곡까지 조회할 수 있습니다.
 //
 // 사용법:
-//   node scripts/fetch-reccobeats-metadata.mjs --probe
-//   node scripts/fetch-reccobeats-metadata.mjs --out reccobeats-raw.jsonl [--limit 200] [--concurrency 2]
+//   node src/music/data/v2/fetch-reccobeats-metadata.mjs --probe
+//   node src/music/data/v2/fetch-reccobeats-metadata.mjs [--out <결과 파일 경로>] [--limit 200] [--concurrency 2]
 //
+// 결과 파일의 기본 위치는 src/music/.local/reccobeats-raw.jsonl 입니다. 이 폴더는 .gitignore에 포함되어 커밋되지 않습니다.
 // 시험용 환경변수: RECCOBEATS_API_BASE_URL (가짜 서버로 동작을 확인할 때 사용합니다)
-// ReccoBeats의 데이터 저장·재사용 조건은 직접 확인해 주십시오. 결과 파일은 저장소 밖에 보관하는 것을 권장합니다.
+// ReccoBeats의 데이터 저장·재사용 조건은 직접 확인해 주십시오.
 //
 // 결과 파일의 한 줄은 다음 형태입니다.
 //   { "requestedId": "...", "status": 200, "track": { ...ReccoBeats 원본 항목... } }
@@ -14,16 +15,18 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, truncateSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SONGS_PATH = new URL('../src/music/data/experiment-v1/songs.jsonl', import.meta.url);
+const SONGS_PATH = new URL('../experiment-v1/songs.jsonl', import.meta.url);
+const DEFAULT_OUT_PATH = fileURLToPath(new URL('../../.local/reccobeats-raw.jsonl', import.meta.url));
 const API_BASE_URL = process.env.RECCOBEATS_API_BASE_URL ?? 'https://api.reccobeats.com/v1';
 const BATCH_SIZE = 40;
 const MAX_ATTEMPTS = 6;
 const MAX_RATE_LIMIT_WAIT_SEC = 300;
 
 const USAGE = `사용법:
-  node scripts/fetch-reccobeats-metadata.mjs --probe
-  node scripts/fetch-reccobeats-metadata.mjs --out <결과 파일 경로> [--limit <곡 수>] [--concurrency <동시 요청 수>]`;
+  node src/music/data/v2/fetch-reccobeats-metadata.mjs --probe
+  node src/music/data/v2/fetch-reccobeats-metadata.mjs [--out <결과 파일 경로>] [--limit <곡 수>] [--concurrency <동시 요청 수>]`;
 
 function parseArgs(argv) {
     const options = { probe: false, out: undefined, limit: undefined, concurrency: 2 };
@@ -312,7 +315,6 @@ function summarize(songs, outPath) {
 // ---------- 실행 ----------
 
 const options = parseArgs(process.argv.slice(2));
-if (!options.probe && !options.out) fail(`--out 옵션이 필요합니다. (결과 파일은 저장소 밖에 두는 것을 권장합니다.)\n${USAGE}`);
 if (options.limit !== undefined && !(options.limit > 0)) fail('--limit은 0보다 큰 숫자여야 합니다.');
 if (!(options.concurrency >= 1)) fail('--concurrency는 1 이상의 숫자여야 합니다.');
 
@@ -320,7 +322,7 @@ const songs = readSongs(options.limit);
 if (options.probe) {
     await probe(songs);
 } else {
-    const outPath = resolve(options.out.replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
+    const outPath = resolve((options.out ?? DEFAULT_OUT_PATH).replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
     mkdirSync(dirname(outPath), { recursive: true });
     process.once('SIGINT', () => {
         shared.stopReason ??= '중단 요청(Ctrl+C)을 받았습니다. 진행 중인 요청을 마무리하고 저장된 곳에서 멈춥니다.';
