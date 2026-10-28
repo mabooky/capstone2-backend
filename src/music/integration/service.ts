@@ -1,10 +1,10 @@
 import { recommend } from '../algorithm/recommend.js';
 import { DataError, DatabaseError, InputError, parseInput, toExternal,
   type RecommendationOutput, type RequestContext } from './dto.js';
-import { RecommendationRepository } from './repository.js';
+import type { RecommendationRepository } from './repository.js';
 
 export class RecommendationService {
-  constructor(private readonly repository: RecommendationRepository) {}
+  constructor(private readonly repository: Pick<RecommendationRepository, 'read'>) {}
   async recommend(input: unknown, context: RequestContext = {}): Promise<RecommendationOutput> {
     const request = parseInput(input, context);
     if (request.limit === 0) return { coordinateSpace: 'unit-interval-v1', view: request.view,
@@ -13,11 +13,14 @@ export class RecommendationService {
     try {
       const result = recommend(snapshot.rows, request);
       const tracks = result.tracks.map(({ row }) => {
-        const songId = String(row.song_id), metadata = snapshot.metadata.get(songId);
+        const songId = String(row.song_id), metadata = snapshot.metadata.get(row.spotify_id);
         if (!metadata) throw new DataError('Catalog metadata missing');
-        return { songId, spotifyId: row.spotify_id, reccobeatsId: metadata.reccobeatsId,
+        if (metadata.songId !== songId || typeof metadata.title !== 'string' || !metadata.title.trim() ||
+            typeof metadata.artist !== 'string' || !metadata.artist.trim() ||
+            (metadata.durationMs !== null && (!Number.isSafeInteger(metadata.durationMs) || metadata.durationMs < 0)))
+          throw new DataError('Invalid or mismatched catalog metadata');
+        return { songId, spotifyId: row.spotify_id,
           title: metadata.title, artist: metadata.artist, durationMs: metadata.durationMs,
-          albumImageUrl: null,
           valence: toExternal(Number(row.valence)), arousal: toExternal(Number(row.arousal)),
           normalization: { valence: row.valence_normalization_version, arousal: row.arousal_normalization_version } };
       });

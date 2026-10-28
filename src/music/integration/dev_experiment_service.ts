@@ -1,9 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { recommend } from '../algorithm/recommend.js';
 import { experimentRows } from '../db/experiment_input.js';
 import { openCompactExperiment } from '../db/compact_experiment.js';
-import { InputError, parseInput } from './dto.js';
+import { InputError, parseInput, type ExperimentRecommendationOutput } from './dto.js';
+import { RecommendationService } from './service.js';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 export const defaultDatasetRoot = resolve(repositoryRoot, 'src/music/data/experiment-v1');
@@ -11,7 +11,7 @@ export const defaultDatasetRoot = resolve(repositoryRoot, 'src/music/data/experi
 export class ExperimentUnavailableError extends Error {}
 export class UnsupportedExperimentSourceError extends ExperimentUnavailableError {}
 
-/** Development only: never constructs RecommendationService or canonical songs. */
+/** Supplies packaged experiment data to the shared recommendation service; never canonical songs. */
 export class DevExperimentService {
   private opening: ReturnType<typeof openCompactExperiment> | undefined;
   constructor(private readonly root = defaultDatasetRoot, private readonly source = 'dataset',
@@ -33,7 +33,7 @@ export class DevExperimentService {
     return this.opening;
   }
 
-  async recommend(input: unknown) {
+  async recommend(input: unknown): Promise<ExperimentRecommendationOutput> {
     const fields = ['coordinateSpace', 'view', 'valence', 'arousal', 'limit'];
     if (!input || typeof input !== 'object' || Array.isArray(input) ||
         fields.some(key => !Object.hasOwn(input, key)) ||
@@ -41,20 +41,20 @@ export class DevExperimentService {
       throw new InputError('Exactly coordinateSpace, view, valence, arousal and limit are required');
     }
     const request = parseInput(input);
-    let envelope;
-    try { envelope = await (await this.reader()).model(request.view); }
+    let reader, envelope;
+    try {
+      reader = await this.reader();
+      envelope = await reader.model(request.view);
+    }
     catch (cause) {
       if (cause instanceof ExperimentUnavailableError) throw cause;
       throw new ExperimentUnavailableError('Local experiment unavailable', { cause });
     }
     const rows = experimentRows(envelope, { allowUnverifiedLocalExperiment: true });
-    const result = recommend(rows, request);
+    const service = new RecommendationService({ read: async () => ({ rows, metadata: reader.metadata() }) });
+    const result = await service.recommend(input);
     return {
-      coordinateSpace: 'unit-interval-v1' as const,
-      view: request.view,
-      returnedCount: result.tracks.length,
-      spotifyIds: result.tracks.map(track => track.row.spotify_id),
-      reason: result.reason,
+      ...result,
       experimental: true,
       verified: false,
       canonicalSongIds: false,

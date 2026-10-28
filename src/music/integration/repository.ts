@@ -6,6 +6,7 @@ export interface MusicQueryClient {
   query(sql: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
 }
 export interface SongMetadata {
+  readonly songId: string;
   readonly title: string;
   readonly artist: string;
   readonly durationMs: number | null;
@@ -13,6 +14,7 @@ export interface SongMetadata {
 }
 export interface CandidateSnapshot {
   readonly rows: readonly RecommendationViewRow[];
+  /** Keyed by Spotify ID; songId must agree with the recommendation row. */
   readonly metadata: ReadonlyMap<string, SongMetadata>;
 }
 function text(value: unknown): string {
@@ -56,7 +58,7 @@ function row(value: unknown): { row: RecommendationViewRow; metadata: SongMetada
       valence_normalization_config: config(r.valence_normalization_config),
       arousal_normalization_config: config(r.arousal_normalization_config),
     },
-    metadata: { title: text(r.catalog_title), artist: text(r.catalog_artist),
+    metadata: { songId: id(r.song_id), title: text(r.catalog_title), artist: text(r.catalog_artist),
       durationMs: duration as number | null, reccobeatsId: recco as string | null },
   };
 }
@@ -85,11 +87,11 @@ export class RecommendationRepository {
     if (!Array.isArray(raw)) throw new DataError('Invalid query result');
     const rows: RecommendationViewRow[] = [], metadata = new Map<string, SongMetadata>();
     for (const value of raw) {
-      const parsed = row(value), songId = String(parsed.row.song_id), previous = metadata.get(songId);
+      const parsed = row(value), spotifyId = parsed.row.spotify_id, previous = metadata.get(spotifyId);
       if (previous && JSON.stringify(previous) !== JSON.stringify(parsed.metadata))
         throw new DataError('Conflicting catalog metadata');
       rows.push(parsed.row);
-      metadata.set(songId, parsed.metadata);
+      metadata.set(spotifyId, parsed.metadata);
     }
     return { rows, metadata };
   }

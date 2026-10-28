@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { NormalizationConfig, RecommendationView, RecommendationViewRow } from '../algorithm/recommend.js';
 import type { LocalExperimentEnvelope } from './experiment_input.js';
+import type { SongMetadata } from '../integration/repository.js';
 
 export const COMPACT_COLUMNS = [
   'experiment_song_id', 'spotify_id', 'reccobeats_source_id', 'muse_source_id',
@@ -132,8 +133,14 @@ export async function openCompactExperiment(root: string, options: { allowUnveri
       if (i >= 9) assert.ok(Number(r[i]) >= -1 && Number(r[i]) <= 1);
     }
   }
+  const metadata = new Map<string, SongMetadata>(records.map(record => [record[1]!, {
+    songId: record[0]!, title: record[15]!, artist: record[16]!, durationMs: null, reccobeatsId: null,
+  }]));
   return {
     manifest,
+    metadata(): ReadonlyMap<string, SongMetadata> {
+      return new Map([...metadata].map(([id, value]) => [id, { ...value }]));
+    },
     async model(model: string): Promise<LocalExperimentEnvelope> {
       assert.ok(Object.hasOwn(MODEL_AXES, model), 'Unknown experiment model');
       return {

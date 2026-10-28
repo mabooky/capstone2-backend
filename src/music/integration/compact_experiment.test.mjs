@@ -10,6 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../../app.ts';
 import { openCompactExperiment, MODEL_AXES, COMPACT_COLUMNS } from '../db/compact_experiment.ts';
 import { recommend } from '../algorithm/recommend.ts';
+import { RecommendationService } from './service.ts';
+import { DataError } from './dto.ts';
+import { RecommendationRepository } from './repository.ts';
 
 const dataset = fileURLToPath(new URL('../data/experiment-v1/', import.meta.url));
 const optIn = { allowUnverifiedLocalExperiment: true };
@@ -83,10 +86,82 @@ test('metadata is complete and text fields are validated separately from numeric
     await checkMutation(16, 123, /nonempty strings/);
     await checkMutation(5, 'not-a-number');
     await checkMutation(9, '1.1');
+    await checkMutation(1, records[1][1], /Duplicate dataset identity/);
+    await checkMutation(0, records[1][0], /Duplicate dataset identity/);
   } finally {
     assert(relative(resolve(tmpdir()), resolve(temporary)).startsWith('music-compact-test-'));
     await rm(temporary, { recursive: true });
   }
+});
+
+test('Spotify-keyed metadata covers every song and returned snapshots are isolated', async () => {
+  const reader = await openCompactExperiment(dataset, optIn);
+  try {
+    const records = (await readFile(join(dataset, 'songs.jsonl'), 'utf8')).trimEnd().split('\n').map(JSON.parse);
+    const metadata = reader.metadata();
+    assert.equal(metadata.size, 27948);
+    for (const record of records) assert.deepEqual(metadata.get(record[1]), {
+      songId: record[0], title: record[15], artist: record[16], durationMs: null, reccobeatsId: null,
+    });
+    metadata.get(records[0][1]).title = 'mutated snapshot';
+    metadata.delete(records[1][1]);
+    const fresh = reader.metadata();
+    assert.equal(fresh.get(records[0][1]).title, records[0][15]);
+    assert.equal(fresh.size, 27948);
+  } finally { await reader.close(); }
+});
+
+test('shared service joins by Spotify ID, rejects missing/mismatched metadata and handles empty results', async () => {
+  const reader = await openCompactExperiment(dataset, optIn);
+  try {
+    const rows = (await reader.model('A')).rows.slice(0, 2);
+    const metadata = new Map([...reader.metadata()].reverse());
+    const service = new RecommendationService({ read: async () => ({ rows, metadata }) });
+    const result = await service.recommend(request('A'));
+    assert(result.tracks.length > 0);
+    for (const track of result.tracks) {
+      assert.equal(track.title, metadata.get(track.spotifyId).title);
+      assert.equal(track.songId, metadata.get(track.spotifyId).songId);
+    }
+    const selected = result.tracks[0].spotifyId, original = metadata.get(selected);
+    metadata.delete(selected);
+    await assert.rejects(() => service.recommend(request('A')), DataError);
+    for (const change of [{ songId: '999999' }, { title: ' ' }, { artist: null }, { durationMs: -1 }]) {
+      metadata.set(selected, { ...original, ...change });
+      await assert.rejects(() => service.recommend(request('A')), DataError);
+    }
+    const empty = await new RecommendationService({ read: async () => ({ rows: [], metadata: new Map() }) })
+      .recommend(request('A'));
+    assert.deepEqual(empty.tracks, []); assert.equal(empty.returnedCount, 0); assert.equal(empty.reason, 'no-candidates');
+    const zero = await new RecommendationService({ read: () => { throw Error('Must not query'); } })
+      .recommend(request('A', { limit: 0 }));
+    assert.deepEqual(zero.tracks, []); assert.equal(zero.reason, 'zero-limit');
+  } finally { await reader.close(); }
+});
+
+test('SQL snapshot adapter shares the track contract and rejects conflicting metadata without a database', async () => {
+  const reader = await openCompactExperiment(dataset, optIn);
+  try {
+    const rows = (await reader.model('A')).rows.slice(0, 2), metadata = reader.metadata();
+    const raw = rows.map(row => {
+      const song = metadata.get(row.spotify_id);
+      return { ...row, catalog_title: song.title, catalog_artist: song.artist,
+        catalog_duration_ms: null, catalog_reccobeats_id: null };
+    }).reverse();
+    const repository = new RecommendationRepository({ query: async () => ({ rows: [...raw, raw[0]] }) });
+    const snapshot = await repository.read('A');
+    assert.equal(snapshot.metadata.get(raw[0].spotify_id).songId, raw[0].song_id);
+    const result = await new RecommendationService(repository).recommend(request('A'));
+    const expected = recommend(rows, { view: 'A', valence: 0, arousal: 0, limit: 5 });
+    assert.deepEqual(result.tracks.map(track => track.spotifyId), expected.tracks.map(track => track.row.spotify_id));
+    for (const track of result.tracks) {
+      assert.equal(track.title, metadata.get(track.spotifyId).title);
+      assert.equal(track.durationMs, null);
+      assert(!('reccobeatsId' in track)); assert(!('albumImageUrl' in track));
+    }
+    const broken = new RecommendationRepository({ query: async () => ({ rows: [raw[0], { ...raw[0], catalog_title: 'Conflicting' }] }) });
+    await assert.rejects(() => broken.read('A'), DataError);
+  } finally { await reader.close(); }
 });
 
 test('default development HTTP source is the packaged dataset', async () => {
@@ -97,9 +172,9 @@ test('default development HTTP source is the packaged dataset', async () => {
     assert.equal(result.status, 200);
     const expected = recommend((await reader.model('B1')).rows,
       { view: 'B1', valence: 0, arousal: 0, limit: 5 }).tracks.map(track => track.row.spotify_id);
-    assert.deepEqual(result.body.spotifyIds, expected);
+    assert.deepEqual(result.body.tracks.map(track => track.spotifyId), expected);
     assert.equal(result.body.experimental, true); assert.equal(result.body.verified, false);
-    assert.equal('tracks' in result.body, false);
+    assert.equal('spotifyIds' in result.body, false);
     assert.equal((await http.post(request('invalid'))).status, 400);
   } finally { await http.close(); await reader.close(); }
 });
@@ -137,6 +212,43 @@ test('checksum corruption and verified promotion are rejected', async () => {
     await writeFile(join(copy, 'manifest.json'), JSON.stringify(manifest));
     await assert.rejects(() => openCompactExperiment(copy, optIn));
     await assert.rejects(() => openCompactExperiment(dataset, {}));
+  } finally {
+    assert(relative(resolve(tmpdir()), resolve(temporary)).startsWith('music-compact-test-'));
+    await rm(temporary, { recursive: true });
+  }
+});
+
+test('invalid metadata stays a sanitized 503 and invalid recommendation coordinates stay a 500', async () => {
+  const temporary = await mkdtemp(join(tmpdir(), 'music-compact-test-'));
+  try {
+    const copy = join(temporary, 'copy');
+    await cp(dataset, copy, { recursive: true });
+    const manifest = JSON.parse(await readFile(join(copy, 'manifest.json'), 'utf8'));
+    async function replaceArtifact(name, bytes) {
+      manifest.artifacts[name] = { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+      await writeFile(join(copy, name), bytes);
+      await writeFile(join(copy, 'manifest.json'), JSON.stringify(manifest));
+    }
+    const original = await readFile(join(copy, 'songs.jsonl'));
+    const records = original.toString('utf8').trimEnd().split('\n').map(JSON.parse);
+    records[0][15] = ' ';
+    await replaceArtifact('songs.jsonl', Buffer.from(records.map(r => JSON.stringify(r) + '\n').join('')));
+    let http = await server({ nodeEnv: 'development', enabled: true, datasetRoot: copy });
+    try {
+      const response = await http.post(request('A'));
+      assert.equal(response.status, 503); assert.equal(response.body.error.code, 'EXPERIMENT_UNAVAILABLE');
+      assert(!JSON.stringify(response.body).includes(temporary));
+    } finally { await http.close(); }
+    const invalidRows = original.toString('utf8').trimEnd().split('\n').map(JSON.parse);
+    // Number rounds this to 1; the algorithm's exact-decimal boundary check must still reject it.
+    invalidRows[0][9] = '1.0000000000000000000000000001';
+    await replaceArtifact('songs.jsonl', Buffer.from(invalidRows.map(r => JSON.stringify(r) + '\n').join('')));
+    http = await server({ nodeEnv: 'development', enabled: true, datasetRoot: copy });
+    try {
+      const response = await http.post(request('A'));
+      assert.equal(response.status, 500); assert.equal(response.body.error.code, 'EXPERIMENT_DATA_INVALID');
+      assert(!JSON.stringify(response.body).includes(temporary));
+    } finally { await http.close(); }
   } finally {
     assert(relative(resolve(tmpdir()), resolve(temporary)).startsWith('music-compact-test-'));
     await rm(temporary, { recursive: true });
@@ -308,12 +420,16 @@ const regression = [
 ];
 test('five-model ordered Spotify IDs retain the pre-streamlining baseline', async () => {
   const reader = await openCompactExperiment(dataset, optIn);
+  const http = await server({ nodeEnv: 'development', enabled: true });
   try {
     for (const { request, spotifyIds } of regression) {
       const result = recommend((await reader.model(request.view)).rows, {
         view: request.view, valence: request.valence * 2 - 1, arousal: request.arousal * 2 - 1, limit: request.limit,
       });
       assert.deepEqual(result.tracks.map(t => t.row.spotify_id), spotifyIds);
+      const response = await http.post(request);
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.body.tracks.map(track => track.spotifyId), spotifyIds);
     }
-  } finally { await reader.close(); }
+  } finally { await http.close(); await reader.close(); }
 });

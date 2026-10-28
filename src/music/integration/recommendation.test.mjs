@@ -78,19 +78,19 @@ test('SQL endpoint tracks retain 0/1 after round trip; nearest track is first',a
   const middle=await serviceFor(db).recommend(request('B1',{limit:1}));
   assert.equal(middle.tracks[0].songId,'1'); assert.equal(middle.tracks[0].valence,0.5);
 });
-test('metadata uses canonical songs, explicit ms, null image and optional Recco ID',async()=>{
+test('metadata uses canonical songs and explicit ms without unused display fields',async()=>{
   const r=await serviceFor(db).recommend(request('A',{limit:1}));
   assert.equal(r.tracks[0].title,'Synthetic 1'); assert.equal(r.tracks[0].durationMs,null);
-  assert.equal(r.tracks[0].albumImageUrl,null); assert.equal(r.tracks[0].reccobeatsId,'00000000-0000-4000-8000-000000000001');
+  assert.equal('albumImageUrl' in r.tracks[0],false); assert.equal('reccobeatsId' in r.tracks[0],false);
   assert.equal('requestStatus' in r.tracks[0],false);
   assert.equal('raw_value' in r.tracks[0],false);
 });
-test('MuSe-only candidate remains eligible and Recco ID stays null',async()=>{
+test('MuSe-only candidate remains eligible without a Recco ID',async()=>{
   await db.exec('BEGIN');
   try {
     await db.query("UPDATE music.song_sources SET is_recommendation_source=false WHERE provider='reccobeats' AND song_id=1");
     const r=await serviceFor(db).recommend(request('B1',{limit:1}));
-    assert.equal(r.tracks[0].songId,'1'); assert.equal(r.tracks[0].reccobeatsId,null);
+    assert.equal(r.tracks[0].songId,'1'); assert.equal('reccobeatsId' in r.tracks[0],false);
   } finally {await db.exec('ROLLBACK');}
 });
 test('client and server exclusions are combined, deduplicated and parameterized',async()=>{

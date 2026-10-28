@@ -17,11 +17,9 @@ export interface RequestContext { readonly excludeSongIds?: readonly string[] }
 export interface RecommendationTrack {
   readonly songId: string;
   readonly spotifyId: string;
-  readonly reccobeatsId: string | null;
   readonly title: string;
   readonly artist: string;
   readonly durationMs: number | null;
-  readonly albumImageUrl: null;
   readonly valence: number;
   readonly arousal: number;
   readonly normalization: { readonly valence: string; readonly arousal: string };
@@ -32,6 +30,13 @@ export interface RecommendationOutput {
   readonly tracks: readonly RecommendationTrack[];
   readonly returnedCount: number;
   readonly reason: RecommendationResult['reason'];
+}
+export interface ExperimentRecommendationOutput extends RecommendationOutput {
+  readonly experimental: true;
+  readonly verified: false;
+  readonly canonicalSongIds: false;
+  readonly idNamespace: 'music_experiment.common_songs';
+  readonly datasetId: string;
 }
 export interface ParsedInput {
   readonly view: RecommendationView;

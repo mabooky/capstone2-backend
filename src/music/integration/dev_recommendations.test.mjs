@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { mkdtemp, cp, writeFile } from 'node:fs/promises';
+import { mkdtemp, cp, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -101,20 +101,43 @@ test('missing and corrupt packaged artifacts return sanitized 503; existing GET 
 
 test('five models at central/asymmetric coordinates match direct ranking and response contract', async () => {
   const reader = await openCompactExperiment(dataset, { allowUnverifiedLocalExperiment: true });
+  const records = (await readFile(join(dataset, 'songs.jsonl'), 'utf8')).trimEnd().split('\n').map(JSON.parse);
+  const metadata = new Map(records.map(row => [row[1], row]));
   try {
     await withServer(enabled, async ({ post }) => {
       for (const view of ['A', 'B1', 'B2', 'C1', 'C2']) for (const [valence, arousal] of [[.5, .5], [.1, .9]]) {
         const input = request(view, { valence, arousal }), response = await post(input);
         assert.equal(response.status, 200); const result = await response.json();
-        const expected = recommend((await reader.model(view)).rows, parseInput(input)).tracks.map(t => t.row.spotify_id);
-        assert.deepEqual(result.spotifyIds, expected); assert.equal(result.returnedCount, expected.length);
+        const ranked = recommend((await reader.model(view)).rows, parseInput(input));
+        const expected = ranked.tracks.map(t => t.row.spotify_id);
+        assert.deepEqual(result.tracks.map(track => track.spotifyId), expected);
+        assert.equal(result.returnedCount, result.tracks.length);
+        assert.equal(result.reason, ranked.reason);
+        assert.deepEqual(Object.keys(result).sort(), ['coordinateSpace', 'view', 'tracks', 'returnedCount',
+          'reason', 'experimental', 'verified', 'canonicalSongIds', 'idNamespace', 'datasetId'].sort());
+        for (const [index, track] of result.tracks.entries()) {
+          const record = metadata.get(track.spotifyId), row = ranked.tracks[index].row;
+          assert.deepEqual(Object.keys(track).sort(), ['songId', 'spotifyId', 'title', 'artist', 'durationMs',
+            'valence', 'arousal', 'normalization'].sort());
+          assert.equal(track.songId, record[0]);
+          assert.equal(track.title, record[15]); assert.equal(track.artist, record[16]);
+          assert.equal(track.durationMs, null);
+          assert.equal(track.valence, (Number(row.valence) + 1) / 2);
+          assert.equal(track.arousal, (Number(row.arousal) + 1) / 2);
+          assert(track.valence >= 0 && track.valence <= 1 && track.arousal >= 0 && track.arousal <= 1);
+          assert.deepEqual(track.normalization, { valence: row.valence_normalization_version, arousal: row.arousal_normalization_version });
+        }
         assert.equal(result.view, view); assert.equal(result.experimental, true); assert.equal(result.verified, false);
         assert.equal(result.canonicalSongIds, false); assert.equal(result.idNamespace, 'music_experiment.common_songs');
         assert.equal(result.datasetId, reader.manifest.dataset_id); assert.equal(result.coordinateSpace, 'unit-interval-v1');
-        assert(result.spotifyIds.every(id => /^[A-Za-z0-9]{22}$/.test(id)));
-        assert.equal(response.headers.get('cache-control'), 'no-store'); assert(!('tracks' in result));
+        assert(result.tracks.every(track => /^[A-Za-z0-9]{22}$/.test(track.spotifyId)));
+        assert.equal(response.headers.get('cache-control'), 'no-store'); assert(!('spotifyIds' in result));
       }
-      assert.deepEqual(await (await post(request('B1', { limit: 0 }))).json().then(r => r.spotifyIds), []);
+      const zero = await (await post(request('B1', { limit: 0 }))).json();
+      assert.deepEqual(zero.tracks, []); assert.equal(zero.returnedCount, 0); assert.equal(zero.reason, 'zero-limit');
+      assert.equal(zero.verified, false); assert.equal(zero.canonicalSongIds, false);
+      const capped = await (await post(request('A', { limit: 100 }))).json();
+      assert.equal(capped.returnedCount, 100); assert.equal(capped.tracks.length, 100);
       const concurrent = await Promise.all(['A', 'B2', 'C2'].map(v => post(request(v))));
       assert(concurrent.every(r => r.status === 200));
     });
