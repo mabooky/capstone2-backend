@@ -1,4 +1,4 @@
-# 스마트 주크박스 MVP — API 명세 (v0.5)
+# 스마트 주크박스 MVP — API 명세 (v0.6)
 
 이 문서는 Frontend 개발을 위한 API 계약서입니다. 모든 엔드포인트, 데이터 타입, 에러 코드, 예시 응답을 이 문서 하나에서 확인할 수 있습니다.
 백엔드 구현이 완료되기 전에는 각 항목의 예시 응답을 고정 응답(mock)으로 사용하여 개발을 진행할 수 있습니다.
@@ -39,8 +39,10 @@ type Track = {
   albumImageUrl: string;
   valence: number;         // [-1, 1]
   arousal: number;         // [-1, 1]
-  requestStatus: RequestStatus;
 };
+
+// 카탈로그와 검색 결과에서만 사용합니다.
+type TrackWithStatus = Track & { requestStatus: RequestStatus };
 
 type Mood = {
   valence: number;         // [-1, 1]
@@ -48,21 +50,21 @@ type Mood = {
   n: number;               // 가드레일에 포함할 곡 수 (1~100, 기본값 100)
 };
 
-type QueueItem = {
+type QueueEntry = {
   queueId: string;
   track: Track;
   requestedAt: number;     // epoch ms
   mine: boolean;           // 요청 헤더의 X-Client-Id 기준
 };
 
-type NowPlaying = {
+type NowPlayingEntry = {
   track: Track;
   startedAt: number;       // epoch ms
   source: 'request' | 'fallback';   // 고객 신청 / 대기열이 비어 자동 재생
 };
 ```
 
-`requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
+`requestStatus`는 카탈로그와 검색 결과(`TrackWithStatus`)에서만 붙으며, 그 밖의 응답에 포함된 곡은 모두 `requestStatus`가 없는 `Track`입니다. `requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
 
 | `requestStatus` | 화면 처리 |
 |---|---|
@@ -117,7 +119,7 @@ type NowPlaying = {
 
 ### GET /catalog
 
-기준점에서 가장 가까운 n곡을 가까운 순서로 반환합니다. 응답은 `Track[]`이며, 모두 가드레일 안의 곡이므로 `out-of-mood` 상태는 포함되지 않습니다.
+기준점에서 가장 가까운 n곡을 가까운 순서로 반환합니다. 응답은 `TrackWithStatus[]`이며, 모두 가드레일 안의 곡이므로 `out-of-mood` 상태는 포함되지 않습니다.
 
 MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화면을 열 때(새로고침 포함)와 신청이 실패한 후에 이 API를 다시 호출해 주십시오.
 
@@ -237,8 +239,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
       "duration": 201000,
       "albumImageUrl": "https://example.com/mock/cover3.jpg",
       "valence": 0.31,
-      "arousal": 0.02,
-      "requestStatus": "now-playing"
+      "arousal": 0.02
     },
     "startedAt": 1761649900000,
     "source": "request"
@@ -253,8 +254,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
         "duration": 269000,
         "albumImageUrl": "https://example.com/mock/cover2.jpg",
         "valence": 0.05,
-        "arousal": -0.05,
-        "requestStatus": "already-queued"
+        "arousal": -0.05
       },
       "requestedAt": 1761649950000,
       "mine": true
@@ -277,7 +277,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
 { "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7" }
 ```
 
-성공 `201 Created` (`QueueItem`):
+성공 `201 Created` (`QueueEntry`):
 ```json
 {
   "queueId": "q8",
@@ -288,8 +288,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
     "duration": 186000,
     "albumImageUrl": "https://example.com/mock/cover1.jpg",
     "valence": 0.18,
-    "arousal": -0.22,
-    "requestStatus": "already-queued"
+    "arousal": -0.22
   },
   "requestedAt": 1761650010000,
   "mine": true
@@ -379,7 +378,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
 { "valence": 0.2, "arousal": -0.1, "n": 50 }
 ```
 
-응답 `200 OK`: 새로운 카탈로그 `Track[]` (형식은 `GET /catalog`와 동일합니다.)
+응답 `200 OK`: 새로운 카탈로그 `TrackWithStatus[]` (형식은 `GET /catalog`와 동일합니다.)
 
 ### GET /admin/mood/preview
 
@@ -391,7 +390,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
 | `arousal` | 필수이며 [-1, 1] 범위여야 합니다. |
 | `n` | 선택 항목이며 1~100 범위의 정수입니다. 생략하면 100이 적용됩니다. |
 
-- 응답은 `GET /catalog`와 같은 형태의 `Track[]`이며, 지정한 좌표에서 가까운 순서로 정렬됩니다. `requestStatus`도 `GET /catalog`와 같은 규칙으로 계산되며, `out-of-mood`는 포함되지 않습니다.
+- 응답은 `Track[]`이며, 지정한 좌표에서 가까운 순서로 정렬됩니다. 곡의 신청 상태는 필요하지 않으므로 `requestStatus`는 포함되지 않습니다.
 - **현재 기준점, 카탈로그, 대기열을 변경하지 않습니다.** 기준점의 확정은 `PUT /admin/mood`로 수행합니다.
 - 각 곡에 `valence`와 `arousal`이 포함되어 있으므로, 결과를 사분면 위에 점으로 표시할 수 있습니다.
 - 범위를 벗어난 값이 있으면 400 Bad Request(`INVALID_INPUT`)가 반환됩니다.
@@ -409,8 +408,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
     "duration": 186000,
     "albumImageUrl": "https://example.com/mock/cover1.jpg",
     "valence": 0.18,
-    "arousal": -0.22,
-    "requestStatus": "available"
+    "arousal": -0.22
   },
   {
     "spotifyId": "7xK2pQ9rT4vW1yZ6bC8dE3",
@@ -419,8 +417,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
     "duration": 269000,
     "albumImageUrl": "https://example.com/mock/cover2.jpg",
     "valence": 0.05,
-    "arousal": -0.05,
-    "requestStatus": "already-queued"
+    "arousal": -0.05
   }
 ]
 ```
@@ -442,8 +439,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
   "duration": 186000,
   "albumImageUrl": "https://example.com/mock/cover1.jpg",
   "valence": 0.18,
-  "arousal": -0.22,
-  "requestStatus": "available"
+  "arousal": -0.22
 }
 ```
 
@@ -482,8 +478,7 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
       "duration": 269000,
       "albumImageUrl": "https://example.com/mock/cover2.jpg",
       "valence": 0.05,
-      "arousal": -0.05,
-      "requestStatus": "now-playing"
+      "arousal": -0.05
     },
     "startedAt": 1761650100000,
     "source": "request"

@@ -16,6 +16,5 @@ export type Track = {
     arousal: number;     // [-1, 1]
 }
 
-// API 명세의 Track은 이 타입(TrackWithStatus)에 해당합니다.
 /** 곡에 매장에서의 신청 상태를 붙인, API 응답으로 나가는 형태입니다. */
 export type TrackWithStatus = Track & { requestStatus: RequestStatus };

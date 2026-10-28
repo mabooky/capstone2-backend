@@ -6,20 +6,21 @@ export type Mood = { valence: number; arousal: number; n: number };
 
 type PlaySource = 'request' | 'fallback';
 
-/** 대기열에 들어 있는 한 곡입니다. clientId는 서버 안에서만 쓰고 응답으로 내보내지 않습니다. */
-type QueueEntry = { queueId: string; track: Track; requestedAt: number; clientId: string };
+/** 서버가 저장하는 대기열의 한 곡입니다. clientId는 서버 안에서만 쓰고 응답으로 내보내지 않습니다. */
+type QueueEntryServer = { queueId: string; track: Track; requestedAt: number; clientId: string };
 
-type NowPlayingEntry = { track: Track; startedAt: number; source: PlaySource };
+/** 응답으로 나가는 대기열의 한 곡입니다. API 명세의 QueueEntry에 해당합니다. */
+export type QueueEntry = { queueId: string; track: Track; requestedAt: number; mine: boolean };
+
+/** 재생 중인 곡입니다. 저장 모양과 응답 모양이 같습니다. */
+export type NowPlayingEntry = { track: Track; startedAt: number; source: PlaySource };
 
 /** GET /queue 응답의 모양입니다. */
 export type QueueSnapshot = {
     serverTime: number;
-    nowPlaying: { track: TrackWithStatus; startedAt: number; source: PlaySource } | null;
-    queue: Array<{ queueId: string; track: TrackWithStatus; requestedAt: number; mine: boolean }>;
+    nowPlaying: NowPlayingEntry | null;
+    queue: QueueEntry[];
 };
-
-/** 대기열에 곡을 신청한 직후의 응답 모양입니다. */
-export type QueueItemView = QueueSnapshot['queue'][number];
 
 export interface StoreOptions {
     password: string;
@@ -43,7 +44,7 @@ export class Store {
     /** 기준점에서 가까운 n곡입니다. 기준점이 바뀔 때마다 새로 만들어집니다. */
     private catalog: Track[];
     private catalogIds: Set<string>;
-    private queue: QueueEntry[] = [];
+    private queue: QueueEntryServer[] = [];
     private nowPlaying: NowPlayingEntry | null = null;
     /** 곡별로 마지막에 재생이 시작된 시각입니다. */
     private readonly playedAt = new Map<string, number>();
@@ -87,13 +88,13 @@ export class Store {
         return {
             serverTime: this.now(),
             nowPlaying: this.nowPlaying && {
-                track: this.withStatus(this.nowPlaying.track),
+                track: this.nowPlaying.track,
                 startedAt: this.nowPlaying.startedAt,
                 source: this.nowPlaying.source,
             },
             queue: this.queue.map(entry => ({
                 queueId: entry.queueId,
-                track: this.withStatus(entry.track),
+                track: entry.track,
                 requestedAt: entry.requestedAt,
                 mine: clientId !== undefined && entry.clientId === clientId,
             })),
@@ -123,7 +124,7 @@ export class Store {
      * 명세의 순서대로 검사하고, 모두 통과했을 때만 마지막에 대기열을 바꿉니다.
      * 검사와 변경 사이에 await가 없으므로 다른 요청이 끼어들 수 없습니다.
      */
-    enqueue(clientId: string, spotifyId: string): QueueItemView {
+    enqueue(clientId: string, spotifyId: string): QueueEntry {
         // ---- 검사 ----
         const track = this.library.get(spotifyId);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
@@ -144,7 +145,7 @@ export class Store {
         }
 
         // ---- 변경 ----
-        const entry: QueueEntry = {
+        const entry: QueueEntryServer = {
             queueId: `q${this.nextQueueNumber++}`,
             track,
             requestedAt: this.now(),
@@ -153,7 +154,7 @@ export class Store {
         this.queue.push(entry);
         return {
             queueId: entry.queueId,
-            track: this.withStatus(track),
+            track,
             requestedAt: entry.requestedAt,
             mine: true,
         };
