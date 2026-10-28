@@ -78,10 +78,10 @@ type NowPlaying = {
 
 ### 에러 형식과 코드
 
-모든 에러 응답은 아래 형식을 따릅니다. `retryAfterSec` 항목은 429 Too Many Requests 응답에서만 포함됩니다.
+모든 에러 응답은 아래 형식을 따릅니다. `retryAfterSec` 항목은 429 Too Many Requests 응답에서만 포함됩니다. `message`는 사람이 읽을 수 있는 한국어 안내 문장이며 표현이 바뀔 수 있으므로, 동작을 분기할 때에는 `code` 값을 사용해 주십시오.
 
 ```json
-{ "error": { "code": "TRACK_COOLDOWN", "message": "Track was played recently", "retryAfterSec": 1200 } }
+{ "error": { "code": "TRACK_COOLDOWN", "message": "최근에 재생된 곡입니다.", "retryAfterSec": 1200 } }
 ```
 
 | 상태 | code | 의미 |
@@ -310,13 +310,13 @@ MVP에서는 기준점 변경을 실시간으로 감지하지 않습니다. 화�
 에러 응답 예시는 다음과 같습니다. 나머지 코드는 2절의 형식과 표를 따릅니다.
 ```jsonc
 // 403 Forbidden (OUT_OF_MOOD): 카탈로그를 다시 불러오고 안내 문구를 표시합니다.
-{ "error": { "code": "OUT_OF_MOOD", "message": "Track is outside the current mood range" } }
+{ "error": { "code": "OUT_OF_MOOD", "message": "현재 기준점의 범위를 벗어난 곡입니다." } }
 
 // 429 Too Many Requests (TRACK_COOLDOWN)
-{ "error": { "code": "TRACK_COOLDOWN", "message": "Track was played recently", "retryAfterSec": 1200 } }
+{ "error": { "code": "TRACK_COOLDOWN", "message": "최근에 재생된 곡입니다.", "retryAfterSec": 1200 } }
 
 // 409 Conflict (MY_REQUEST_PENDING)
-{ "error": { "code": "MY_REQUEST_PENDING", "message": "You already have a request in the queue" } }
+{ "error": { "code": "MY_REQUEST_PENDING", "message": "이미 대기열에 신청한 곡이 있습니다." } }
 ```
 
 신청이 성공하면 응답을 화면에 즉시 반영하고(낙관적 업데이트), 이후 폴링 결과로 덮어씁니다.
