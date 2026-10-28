@@ -29,6 +29,8 @@ export interface StoreOptions {
     trackCooldownMs: number;
     /** 현재 시각(epoch ms)을 돌려주는 함수입니다. 시간에 의존하는 동작을 테스트할 때 활용할 수 있습니다. */
     now?: () => number;
+    /** 0 이상 1 미만의 난수를 돌려주는 함수입니다. 무작위로 고르는 동작을 테스트할 때 활용할 수 있습니다. */
+    random?: () => number;
 }
 
 /**
@@ -40,6 +42,7 @@ export class Store {
     readonly password: string;
     private readonly trackCooldownMs: number;
     private readonly now: () => number;
+    private readonly random: () => number;
 
     private mood: Mood = { valence: 0, arousal: 0, n: 100 };
     /** 기준점에서 가까운 n곡입니다. 기준점이 바뀔 때마다 새로 만들어집니다. */
@@ -58,6 +61,7 @@ export class Store {
         this.password = options.password;
         this.trackCooldownMs = options.trackCooldownMs;
         this.now = options.now ?? Date.now;
+        this.random = options.random ?? Math.random;
         this.catalog = library.nearest(this.mood.valence, this.mood.arousal, this.mood.n);
         this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
     }
@@ -210,5 +214,58 @@ export class Store {
             requestedAt: entry.requestedAt,
             mine: true,
         };
+    }
+
+    /**
+     * PUT /admin/now-playing: 관리자가 재생하려는 곡을 보고받아 재생 상태를 기록합니다.
+     * 명세의 순서대로 검사하고, 모두 통과했을 때만 마지막에 상태를 바꿉니다.
+     */
+    reportNowPlaying(spotifyId: string): NowPlayingEntry {
+        // ---- 검사 ----
+        const track = this.library.get(spotifyId);
+        if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
+
+        let source: PlaySource;
+        let takeFromQueue = false;
+        if (this.nowPlaying?.track.spotifyId === spotifyId) {
+            // 같은 곡을 다시 재생하는 경우입니다. 대기열과 source는 그대로 둡니다.
+            source = this.nowPlaying.source;
+        } else if (this.queue.length > 0) {
+            if (this.queue[0].track.spotifyId !== spotifyId) {
+                throw new ApiError(409, 'NOT_NEXT_IN_QUEUE', '대기열의 맨 앞 곡이 아닙니다.');
+            }
+            source = 'request';
+            takeFromQueue = true;
+        } else {
+            if (!this.catalogIds.has(spotifyId)) {
+                throw new ApiError(403, 'OUT_OF_MOOD', '현재 기준점의 범위를 벗어난 곡입니다.');
+            }
+            source = 'fallback';
+        }
+
+        // ---- 변경 ----
+        if (takeFromQueue) this.queue.shift();
+        const startedAt = this.now();
+        this.playedAt.set(spotifyId, startedAt);
+        this.nowPlaying = { track, startedAt, source };
+        return this.nowPlaying;
+    }
+
+    /**
+     * GET /admin/fallback-track: 대기열이 비었을 때 자동으로 재생할 곡을 고릅니다. 상태는 바꾸지 않습니다.
+     * 지금 신청할 수 있는 곡 중에서 무작위로 고르고, 없으면 카탈로그에서 가장 오래전에 재생된 곡을 돌려줍니다.
+     */
+    getFallbackTrack(): Track {
+        const available = this.catalog.filter(track => this.statusOf(track) === 'available');
+        if (available.length > 0) return available[Math.floor(this.random() * available.length)];
+
+        let oldest: Track | undefined;
+        for (const track of this.catalog) {
+            const startedAt = this.playedAt.get(track.spotifyId);
+            if (startedAt === undefined) continue;
+            if (oldest === undefined || startedAt < this.playedAt.get(oldest.spotifyId)!) oldest = track;
+        }
+        if (!oldest) throw new ApiError(409, 'NO_TRACKS', '재생할 수 있는 곡이 없습니다.');
+        return oldest;
     }
 }
