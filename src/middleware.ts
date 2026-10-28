@@ -1,4 +1,4 @@
-import type { ErrorRequestHandler } from 'express';
+import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { ApiError } from './errors.js';
 
 /** 요청 처리 중 발생한 오류를 명세의 에러 응답 형식으로 바꿉니다. 모든 라우터 뒤에 등록해야 합니다. */
@@ -29,3 +29,16 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
     
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: '서버에서 예상하지 못한 오류가 발생했습니다.' } });
 };
+
+/** :storeId에 해당하는 매장을 찾아 res.locals.store에 담습니다. 매장이 없으면 404 STORE_NOT_FOUND를 반환합니다. */
+export function resolveStore<T>(stores: ReadonlyMap<string, T>): RequestHandler {
+    return (req, res, next) => {
+        const storeId = req.params.storeId;
+        const store = typeof storeId === 'string' ? stores.get(storeId) : undefined;
+        if (store === undefined) {
+            throw new ApiError(404, 'STORE_NOT_FOUND', '등록되지 않은 매장입니다.');
+        }
+        res.locals.store = store;
+        next();
+    };
+}
