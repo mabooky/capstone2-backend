@@ -1,0 +1,3 @@
+# Payload hashes must survive Windows/Linux checkouts unchanged.
+*.json text eol=lf
+*.jsonl text eol=lf
