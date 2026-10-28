@@ -1,11 +1,17 @@
+export type RequestStatus =
+    | 'available'
+    | 'out-of-mood'
+    | 'already-queued'
+    | 'now-playing'
+    | 'recently-played';
+
 export type Track = {
-    reccobeatsId: string;
     spotifyId: string;
     title: string;
     artist: string;
-    duration: number;
-    albumImageUrl: string;    
-    valence: number;
-    arousal: number;
-    requestStatus: 'available' | 'out-of-mood' | 'already-queued';
+    duration: number;    // ms
+    albumImageUrl: string;
+    valence: number;     // [-1, 1]
+    arousal: number;     // [-1, 1]
+    requestStatus: RequestStatus;
 }
