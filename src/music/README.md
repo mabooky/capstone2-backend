@@ -38,9 +38,11 @@ music/
 
 `compact_experiment.ts`는 파일 해시·건수·식별자 등을 검사하고 6개 고유 축을
 알고리즘의 14필드 입력으로 복원한다. `experiment_input.ts`는 미검증 실험 경계를
-검사한다. `dev_experiment_service.ts`와 `dev_router.ts`가 개발용 HTTP를 담당한다.
-`dto.ts`는 입력과 좌표 변환, `repository.ts`와 `service.ts`는 향후 운영 PostgreSQL
-연결을 위한 코드다. 운영 SQL은 합성 메모리 DB에서만 자동 검사한다.
+검사한다. `dev_experiment_service.ts`는 파일 데이터와 실험 상태를 공급하고,
+`dev_router.ts`가 개발용 HTTP를 담당한다. `service.ts`의 `RecommendationService`는
+파일·SQL 공급 경로에서 공통으로 추천과 `tracks[]` 조립을 수행한다.
+`dto.ts`는 입력과 좌표 변환, `repository.ts`는 향후 PostgreSQL client 주입을 위한
+SQL 조회 코드다. 운영 SQL은 합성 메모리 DB에서만 자동 검사한다.
 
 ## 실행
 
@@ -72,20 +74,31 @@ corepack pnpm start
 `POST http://localhost:3000/api/dev/music/recommendations`
 
 ```json
-{"coordinateSpace":"unit-interval-v1","view":"B1","valence":0.5,"arousal":0.5,"limit":5}
+{"coordinateSpace":"unit-interval-v1","view":"A","valence":0.5,"arousal":0.5,"limit":1}
 ```
 
 5개 필드가 모두 필요하고 추가 필드는 거절한다. 좌표는 0~1의 유한 숫자,
 limit는 0~100 정수다. 내부 좌표는 `2*x-1`로 변환한다.
-응답 형식은 다음과 같다. `spotifyIds`의 문자열 표기는 형식 설명용이며 실제 응답에는
-데이터셋에서 추천한 ID가 순서대로 들어간다. 반경 내 후보가 부족하면 5곡 미만일 수 있다.
+응답은 추천 순서의 음악 객체 배열 `tracks[]`를 반환한다. 최대 100곡이며 반경 내 후보가
+부족해도 임의 곡으로 채우지 않는다. 위 요청의 응답 예시는 다음과 같다.
 
 ```json
 {
   "coordinateSpace":"unit-interval-v1",
-  "view":"B1",
-  "returnedCount":5,
-  "spotifyIds":["<Spotify Track ID 1>","<Spotify Track ID 2>","<Spotify Track ID 3>","<Spotify Track ID 4>","<Spotify Track ID 5>"],
+  "view":"A",
+  "tracks":[
+    {
+      "songId":"18277",
+      "spotifyId":"56b27J3f8IgjauSAbBvA2o",
+      "title":"Friends, Beware",
+      "artist":"Adem",
+      "durationMs":null,
+      "valence":0.5,
+      "arousal":0.498,
+      "normalization":{"valence":"reccobeats-v1","arousal":"reccobeats-v1"}
+    }
+  ],
+  "returnedCount":1,
   "reason":"limit-reached",
   "experimental":true,
   "verified":false,
@@ -95,8 +108,17 @@ limit는 0~100 정수다. 내부 좌표는 `2*x-1`로 변환한다.
 }
 ```
 
-정확한 reason 값은 [알고리즘 계약](algorithm/recommend.ts)을 따른다.
-곡명·아티스트 등 메타데이터는 생성하지 않는다.
+`returnedCount`는 `tracks.length`와 같다. `limit=0`이면 빈 배열과 `zero-limit`를 반환한다.
+정확한 reason 값은 [알고리즘 계약](algorithm/recommend.ts)을 따른다. 최상위 `spotifyIds`는
+반환하지 않으며 `tracks[].spotifyId`를 사용한다.
+각 곡의 `title`, `artist`는 MuSe 출처의 실제 데이터이며 Spotify ID로 연결한다.
+`durationMs`는 미수집으로 전곡 `null`이다. 응답 좌표는 0~1이고 `normalization`에는
+valence/arousal 정규화 버전이 들어간다. `reccobeatsId`, `albumImageUrl`, `requestStatus`는
+추천 응답 필드가 아니다.
+
+`experimental=true`, `verified=false`, `canonicalSongIds=false`를 유지한다.
+`songId`는 `idNamespace=music_experiment.common_songs`의 실험 ID이고,
+`datasetId`와 함께 해석해야 한다. Spotify ID가 있어도 공식 검증·재생 가능성을 뜻하지 않는다.
 
 | HTTP | 의미 |
 |---|---|
@@ -106,6 +128,38 @@ limit는 0~100 정수다. 내부 좌표는 `2*x-1`로 변환한다.
 | 503 EXPERIMENT_UNAVAILABLE | 데이터 파일·manifest 누락 또는 무결성 오류 |
 | 503 UNSUPPORTED_EXPERIMENT_SOURCE | 지원하지 않는 소스 또는 과거 DB 경로 설정 |
 | 500 EXPERIMENT_DATA_INVALID | 추천 입력 데이터 계약 오류 |
+
+## 팀원용 내부 호출
+
+매장 서비스에서는 HTTP 호출 없이 기존 `DevExperimentService.recommend()`를 사용할 수 있다.
+내부에서 동일한 27,948곡 파일 공급과 `RecommendationService`를 사용하며,
+입력은 HTTP와 동일한 5개 필드만 허용하고 `limit`도 필수다.
+아래 import는 `src/services/`에 있는 호출 코드 기준이다.
+
+```ts
+import { DevExperimentService } from '../music/integration/dev_experiment_service.js';
+import type { ExperimentRecommendationOutput } from '../music/integration/dto.js';
+
+// 앱에서 한 인스턴스를 생성해 재사용한다.
+const music = new DevExperimentService();
+
+const result: ExperimentRecommendationOutput = await music.recommend({
+  coordinateSpace: 'unit-interval-v1',
+  view: 'B1', // A | B1 | B2 | C1 | C2
+  valence: 0.5,
+  arousal: 0.7,
+  limit: 100,
+});
+
+// result.tracks, returnedCount, reason과 실험 상태·namespace·datasetId를 함께 사용한다.
+// 앱 종료 시: await music.close();
+```
+
+다른 파일 위치를 사용할 때는 `new DevExperimentService(datasetRoot)`로 경로를 전달한다.
+직접 호출은 `MUSIC_DATASET_ROOT`나 개발 HTTP 활성화 플래그를 자동으로 읽지 않는다.
+점주·매장 권한 검사는 호출 측에서 담당한다. 입력 오류는 `InputError`, 데이터 파일 로딩·
+무결성 오류는 `ExperimentUnavailableError`, 추천 데이터 오류는 `DataError`로 처리할 수 있다.
+이 메서드는 추천 결과만 반환하며 매장별 카탈로그 저장이나 고객 신청을 수행하지 않는다.
 
 ## 모델
 
@@ -138,12 +192,15 @@ PGlite 0.5.10은 devDependency이며 `new PGlite()` 합성 메모리 검사에�
 
 ## 현재 상태와 운영 전환
 
-개발용 HTTP·Spotify ID 반환·5모델 재현·데이터 무결성 검사는 구현되어 있다.
+개발용 HTTP·내부 직접 호출·메타데이터를 포함한 `tracks[]` 반환·5모델 재현·데이터 무결성
+검사는 구현되어 있다. 곡명·아티스트는 MuSe 출처이며 Spotify 공식 검증은 완료되지 않았다.
 실제 Spotify ID의 현재 유효성·재생 가능성, 감정 추천 품질은 이 테스트로 확인하지 않는다.
 운영 전환에는 PostgreSQL client 주입, 승인된 데이터 적재와 검증, 정식 메타데이터,
 인증·매장별 권한·대기열 정책·최종 API 계약의 팀 합의가 필요하다.
 실험 ID는 운영 song ID가 아니며 pending을 verified로 자동 승격하지 않는다.
 기존 `/api/stores/:storeId/catalog`, `/tracks`, `/api/health`의 동작은 유지한다.
+매장 카탈로그·전체 곡 조회는 현재 고정 예시 곡 1개를 반환하며 추천 서비스와 연결되지 않았다.
+매장별 감정 설정·카탈로그 저장·고객 신청·대기열 처리도 미구현이다.
 
 ## 연구 보관과 출처
 

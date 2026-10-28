@@ -85,8 +85,21 @@ ReccoBeats의 MuSe 외부 ID 교차 확인이 기록돼 있다. 이는 Spotify �
 원본·백업 DB를 직접 엔진으로 열지 않으며 재생성은 별도 승인된 격리 사본에서만 검토한다.
 현재 개발 브랜치는 공유 데이터셋의 해시·건수·17열·전곡 제목/아티스트·기존 15필드와
 행 순서의 해시·추천용 14필드·5모델 고정 추천 순서 회귀를 독립 검증한다.
-개발 HTTP 응답은 Spotify ID 목록을 반환하며 제목·아티스트를 반환하지 않는다.
+개발 HTTP와 `DevExperimentService.recommend()`는 공통 `RecommendationService`를 통해
+`tracks[]`를 반환한다. 각 곡은 songId/spotifyId/title/artist/durationMs/valence/arousal/
+normalization을 포함한다. 추천 후 Spotify ID로 제목·아티스트를 연결하며 순서를 유지한다.
+`durationMs=null`, 응답 좌표는 0~1이고 normalization은 두 축의 정규화 버전이다.
+최상위 필드는 coordinateSpace/view/tracks/returnedCount/reason/experimental/verified/
+canonicalSongIds/idNamespace/datasetId이며 `spotifyIds` 배열은 반환하지 않는다.
+입력은 coordinateSpace=`unit-interval-v1`, view=A/B1/B2/C1/C2, valence/arousal=0~1 유한 숫자,
+limit=0~100 정수의 5개 필드가 모두 필수다. 최대 100곡이며 returnedCount는 tracks.length다.
+limit=0이면 빈 배열과 zero-limit를 반환한다. 상세 계약과 내부 호출 예시는
+[음악 모듈 README](../../README.md)를 따른다.
+
+응답의 `experimental=true`, `verified=false`, `canonicalSongIds=false`와 실험 namespace·
+datasetId는 유지한다. 매장 API는 현재 고정 예시 곡을 반환하며 이 추천 결과와 연결되지 않았다.
 
 2026-10-28 검증 결과는 compact·알고리즘·개발 HTTP 테스트 40개 통과, 실패 0이다.
+2026-10-29의 `tracks[]` 통합 후 같은 3개 테스트 파일 검증은 44개 통과, 실패 0이다.
 `recommendation.test.mjs`와 `db/validate.mjs`의 두 검증 명령은 선언된 개발 의존성
 `@electric-sql/pglite`가 현재 설치되지 않아 미실행이며, 전체 SQL 검증 완료를 뜻하지 않는다.
