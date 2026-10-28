@@ -1,5 +1,5 @@
 {
-  "format_version": "music-compact-experiment-v1",
+  "format_version": "music-compact-experiment-v2",
   "dataset_kind": "unverified-local-experiment-v1",
   "dataset_id": "music-experiment-20261020-v3",
   "id_namespace": "music_experiment.common_songs",
@@ -22,7 +22,9 @@
     "muse_theoretical_valence",
     "muse_theoretical_arousal",
     "muse_observed_valence",
-    "muse_observed_arousal"
+    "muse_observed_arousal",
+    "title",
+    "artist"
   ],
   "models": [
     "A",
@@ -33,8 +35,8 @@
   ],
   "artifacts": {
     "songs.jsonl": {
-      "bytes": 8386373,
-      "sha256": "d4d690d86ad26f8011e710f798c85e13b346800d3626ff0641af4c3d1f368f6d"
+      "bytes": 9285573,
+      "sha256": "66b805a1f1654006a1a067ad6b05d6822759bb089162a5cdea85b5453a00fcee"
     },
     "normalization.json": {
       "bytes": 2928,
@@ -57,7 +59,9 @@
     "coordinate_pairs_compared": 139740,
     "all_14_fields_equal_to_pglite": true,
     "original_files_unchanged": true,
-    "original_files_checked": 1027
+    "original_files_checked": 1027,
+    "metadata_rows_matched": 27948,
+    "metadata_missing_or_conflicting_rows": 0
   },
   "rights": {
     "github_sharing_authorized_by": "Project owner confirmation in user instruction, 2026-10-27",
@@ -76,5 +80,19 @@
       "source": "https://reccobeats.com",
       "terms": "https://reccobeats.com/docs/documentation/terms-of-service"
     }
+  },
+  "metadata": {
+    "provider": "muse",
+    "source_version": "zenodo-4281165-v1.0.0",
+    "source_file": "muse_dataset.csv",
+    "source_sha256": "56be88aea7dfa2c0446e0d7cc033d95c3550a3dc4364ac91c815cf998265fd2b",
+    "fields": {
+      "title": "track",
+      "artist": "artist"
+    },
+    "matching": "Exact Spotify ID; exactly one original and cleaned source row; ReccoBeats muse_external_ids cross-checked",
+    "spotify_officially_verified": false,
+    "previous_songs_sha256": "d4d690d86ad26f8011e710f798c85e13b346800d3626ff0641af4c3d1f368f6d",
+    "original_15_columns_and_row_order_preserved": true
   }
 }

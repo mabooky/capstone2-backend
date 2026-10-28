@@ -10,9 +10,10 @@ export const COMPACT_COLUMNS = [
   'reccobeats_source_version', 'reccobeats_valence_raw', 'reccobeats_energy_raw',
   'muse_valence_raw', 'muse_arousal_raw', 'reccobeats_valence', 'reccobeats_energy',
   'muse_theoretical_valence', 'muse_theoretical_arousal', 'muse_observed_valence', 'muse_observed_arousal',
+  'title', 'artist',
 ] as const;
 
-// Indices refer only to the immutable experiment-v1 file format, never SQL IDs.
+// Original 15 indices are preserved in format v2; metadata occupies indices 15/16.
 export const AXES = {
   reccobeats_valence: { value: 9, raw: 5, source: 2, provider: 'reccobeats', metric: 'valence', version: 'reccobeats-v1' },
   reccobeats_energy: { value: 10, raw: 6, source: 2, provider: 'reccobeats', metric: 'energy', version: 'reccobeats-v1' },
@@ -38,7 +39,7 @@ export interface CompactNormalization {
   models: typeof MODEL_AXES;
 }
 export interface CompactManifest {
-  format_version: 'music-compact-experiment-v1';
+  format_version: 'music-compact-experiment-v2';
   dataset_kind: 'unverified-local-experiment-v1';
   dataset_id: string;
   id_namespace: 'music_experiment.common_songs';
@@ -48,6 +49,10 @@ export interface CompactManifest {
   columns: readonly string[];
   models: readonly string[];
   artifacts: Record<'songs.jsonl' | 'normalization.json', { bytes: number; sha256: string }>;
+  metadata: {
+    provider: 'muse'; source_version: string; source_sha256: string;
+    fields: { title: 'track'; artist: 'artist' }; spotify_officially_verified: false;
+  };
 }
 
 export function reconstructRow(record: readonly string[], config: CompactNormalization,
@@ -75,7 +80,7 @@ export function reconstructRow(record: readonly string[], config: CompactNormali
 export async function openCompactExperiment(root: string, options: { allowUnverifiedLocalExperiment: true }) {
   assert.equal(options?.allowUnverifiedLocalExperiment, true, 'Explicit experiment opt-in required');
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8')) as CompactManifest;
-  assert.equal(manifest.format_version, 'music-compact-experiment-v1');
+  assert.equal(manifest.format_version, 'music-compact-experiment-v2');
   assert.equal(manifest.dataset_kind, 'unverified-local-experiment-v1');
   assert.equal(manifest.verified, false); assert.equal(manifest.canonical_song_ids, false);
   assert.equal(manifest.id_namespace, 'music_experiment.common_songs');
@@ -95,6 +100,11 @@ export async function openCompactExperiment(root: string, options: { allowUnveri
   assert.deepEqual(config.models, MODEL_AXES);
   assert.equal(typeof config.shared_source_versions.muse, 'string');
   assert.ok(config.shared_source_versions.muse.trim());
+  assert.equal(manifest.metadata.provider, 'muse');
+  assert.equal(manifest.metadata.source_version, config.shared_source_versions.muse);
+  assert.equal(manifest.metadata.source_sha256, config.axes.muse_theoretical_valence.source_sha256);
+  assert.deepEqual(manifest.metadata.fields, { title: 'track', artist: 'artist' });
+  assert.equal(manifest.metadata.spotify_officially_verified, false);
   assert.deepEqual(Object.keys(config.axes).sort(), Object.keys(AXES).sort());
   for (const name of Object.keys(AXES) as Axis[]) {
     const template = config.axes[name], axis = AXES[name];
@@ -109,13 +119,14 @@ export async function openCompactExperiment(root: string, options: { allowUnveri
   const reccoIds = new Set<string>(), museIds = new Set<string>();
   for (const r of records) {
     assert.ok(Array.isArray(r) && r.length === COMPACT_COLUMNS.length);
-    assert.ok(r.every(value => typeof value === 'string' && value.trim().length > 0));
+    assert.ok(r.every(value => typeof value === 'string' && value.trim().length > 0),
+      'All fields, including title and artist, must be nonempty strings');
     for (const index of [0, 2, 3]) assert.match(r[index]!, /^[1-9]\d*$/);
     assert.match(r[1]!, /^[A-Za-z0-9]{22}$/);
     for (const [index, seen] of [[0, songIds], [1, spotifyIds], [2, reccoIds], [3, museIds]] as const) {
       assert.ok(!seen.has(r[index]!), 'Duplicate dataset identity'); seen.add(r[index]!);
     }
-    for (let i = 5; i < r.length; i++) {
+    for (let i = 5; i < 15; i++) {
       assert.match(r[i]!, /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i);
       assert.ok(Number.isFinite(Number(r[i])));
       if (i >= 9) assert.ok(Number(r[i]) >= -1 && Number(r[i]) <= 1);

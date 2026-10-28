@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
+import { createHash } from 'node:crypto';
 import { readFile, writeFile, cp, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -34,7 +35,8 @@ async function server(options) {
 
 test('shared data reconstructs all 14 fields for five models without PGlite', async t => {
   const reader = await openCompactExperiment(dataset, optIn);
-  assert.equal(reader.manifest.columns.length, 15);
+  assert.equal(reader.manifest.columns.length, 17);
+  assert.equal(reader.manifest.format_version, 'music-compact-experiment-v2');
   assert.deepEqual(reader.manifest.columns, COMPACT_COLUMNS);
   for (const model of Object.keys(MODEL_AXES)) await t.test(model, async () => {
     const envelope = await reader.model(model);
@@ -52,6 +54,39 @@ test('shared data reconstructs all 14 fields for five models without PGlite', as
   assert.notEqual((await reader.model('A')).rows[0].valence_normalization_config.source_version, 'mutated-result');
   await assert.rejects(() => reader.model('NOT_A_MODEL'));
   await reader.close();
+});
+
+test('metadata is complete and text fields are validated separately from numeric axes', async () => {
+  const records = (await readFile(join(dataset, 'songs.jsonl'), 'utf8')).trimEnd().split('\n').map(JSON.parse);
+  assert.equal(records.length, 27948);
+  assert.equal(new Set(records.map(r => r[1])).size, 27948);
+  assert(records.every(r => r.length === 17 && typeof r[15] === 'string' && r[15].trim()
+    && typeof r[16] === 'string' && r[16].trim()));
+  const originalColumns = records.map(r => JSON.stringify(r.slice(0, 15)) + '\n').join('');
+  assert.equal(createHash('sha256').update(originalColumns).digest('hex'),
+    'd4d690d86ad26f8011e710f798c85e13b346800d3626ff0641af4c3d1f368f6d',
+    'Original 15 fields and row order must remain identical to format v1');
+  const temporary = await mkdtemp(join(tmpdir(), 'music-compact-test-'));
+  try {
+    const copy = join(temporary, 'copy');
+    await cp(dataset, copy, { recursive: true });
+    const manifest = JSON.parse(await readFile(join(copy, 'manifest.json'), 'utf8'));
+    async function checkMutation(index, value, pattern) {
+      const modified = records.map((r, i) => i === 0 ? r.map((v, j) => j === index ? value : v) : r);
+      const bytes = Buffer.from(modified.map(r => JSON.stringify(r) + '\n').join(''));
+      manifest.artifacts['songs.jsonl'] = { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+      await writeFile(join(copy, 'songs.jsonl'), bytes);
+      await writeFile(join(copy, 'manifest.json'), JSON.stringify(manifest));
+      await assert.rejects(() => openCompactExperiment(copy, optIn), pattern);
+    }
+    await checkMutation(15, '   ', /nonempty strings/);
+    await checkMutation(16, 123, /nonempty strings/);
+    await checkMutation(5, 'not-a-number');
+    await checkMutation(9, '1.1');
+  } finally {
+    assert(relative(resolve(tmpdir()), resolve(temporary)).startsWith('music-compact-test-'));
+    await rm(temporary, { recursive: true });
+  }
 });
 
 test('default development HTTP source is the packaged dataset', async () => {
@@ -94,6 +129,10 @@ test('checksum corruption and verified promotion are rejected', async () => {
     await assert.rejects(() => openCompactExperiment(copy, optIn), /Size mismatch/);
     await writeFile(path, original);
     const manifest = JSON.parse(await readFile(join(copy, 'manifest.json'), 'utf8'));
+    manifest.metadata.spotify_officially_verified = true;
+    await writeFile(join(copy, 'manifest.json'), JSON.stringify(manifest));
+    await assert.rejects(() => openCompactExperiment(copy, optIn));
+    manifest.metadata.spotify_officially_verified = false;
     manifest.verified = true;
     await writeFile(join(copy, 'manifest.json'), JSON.stringify(manifest));
     await assert.rejects(() => openCompactExperiment(copy, optIn));
@@ -103,7 +142,6 @@ test('checksum corruption and verified promotion are rejected', async () => {
     await rm(temporary, { recursive: true });
   }
 });
-
 
 // Captured from the dataset-only HTTP API at the archived baseline commit 6eb1f96.
 const regression = [

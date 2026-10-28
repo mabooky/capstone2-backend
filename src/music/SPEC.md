@@ -23,10 +23,18 @@ C1=ReccoBeats V+MuSe 이론 A, C2=ReccoBeats V+MuSe 관측 A다.
 
 ## 공유 데이터셋과 추천
 
-[데이터 형식과 사용 조건](data/experiment-v1/README.md)을 따른다. 27,948곡·15열 문자열
-배열에 실험 ID·Spotify ID·source ID/version·원본 점수 4개·고유 축 6개를 보존한다.
-파일 크기·SHA-256·행 수·중복 ID·설정 및 좌표 범위를 검사한 뒤 기존 14필드로 복원한다.
+[데이터 형식과 사용 조건](data/experiment-v1/README.md)을 따른다.
+`music-compact-experiment-v2`는 27,948곡·17열 문자열 배열이다. 기존 0~14열의
+실험 ID·Spotify ID·source ID/version·원본 점수 4개·고유 축 6개와 행 순서를 보존하고,
+15열에 `title`, 16열에 `artist`를 추가했다(인덱스는 0부터 시작).
+파일 크기·SHA-256·행 수·중복 ID·설정·좌표 범위 및 전 필드의 비어 있지 않은 문자열을
+검사한 뒤 추천용 기존 14필드로 복원한다. 제목·아티스트는 추천용 필드에 포함하지 않는다.
 numeric/bigint 정밀도를 보존하며 좌표를 다시 계산하지 않는다.
+
+곡명·아티스트 출처는 MuSe `zenodo-4281165-v1.0.0`의 `muse_dataset.csv`이며
+`track`을 `title`로, `artist`를 `artist`로 보존한다. 매칭 기록과 출처 해시는 manifest의
+metadata에 있다. Spotify 공식 검증은 완료되지 않았으며
+`metadata.spotify_officially_verified=false`다. `duration_ms`는 아직 수집하지 않았다.
 
 추천은 `algorithm/recommend.ts`의 가중 거리·반경 확대·상한·제외·중복 충돌 검사와
 Spotify ID 동점 순서를 그대로 사용한다. 결과가 부족해도 임의 곡을 채우지 않는다.
@@ -39,7 +47,7 @@ namespace=`music_experiment.common_songs`다. 실험 ID를 운영 ID로 전달�
 입력 필드는 coordinateSpace, view, valence, arousal, limit만 허용하며 모두 필수다.
 view는 A/B1/B2/C1/C2, 좌표는 0~1 유한 숫자, limit는 0~100 정수다.
 성공 응답은 coordinateSpace/view/returnedCount/spotifyIds/reason/experimental/verified/
-canonicalSongIds/idNamespace/datasetId이며 가짜 메타데이터를 제공하지 않는다.
+canonicalSongIds/idNamespace/datasetId이며 데이터셋의 제목·아티스트는 응답에 포함하지 않는다.
 
 기본 소스는 공유 dataset 파일이다. 파일형 PGlite는 지원하지 않으며 과거 source와
 experimentRoot 설정은 명시적 503으로 처리한다. 자동 fallback은 없다.
