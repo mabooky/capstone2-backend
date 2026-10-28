@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { errorHandler } from './middleware.js';
 import { storeRouter } from './routes/storeRouter.js';
 import { createDevMusicRouter, type DevMusicOptions } from './music/integration/dev_router.js';
 
@@ -19,5 +20,6 @@ export function createApp(options: DevMusicOptions = {
     app.use('/api/stores/:storeId', storeRouter);
     const devMusic = createDevMusicRouter(options);
     app.use('/api/dev/music', devMusic.router, devMusic.errorHandler);
+    app.use(errorHandler);
     return { app, close: devMusic.close };
 }
