@@ -1,3 +1,4 @@
+import { ApiError } from './errors.js';
 import type { Library } from './library.js';
 import type { RequestStatus, Track, TrackWithStatus } from './models/track.js';
 
@@ -16,6 +17,9 @@ export type QueueSnapshot = {
     nowPlaying: { track: TrackWithStatus; startedAt: number; source: PlaySource } | null;
     queue: Array<{ queueId: string; track: TrackWithStatus; requestedAt: number; mine: boolean }>;
 };
+
+/** 대기열에 곡을 신청한 직후의 응답 모양입니다. */
+export type QueueItemView = QueueSnapshot['queue'][number];
 
 export interface StoreOptions {
     password: string;
@@ -43,6 +47,8 @@ export class Store {
     private nowPlaying: NowPlayingEntry | null = null;
     /** 곡별로 마지막에 재생이 시작된 시각입니다. */
     private readonly playedAt = new Map<string, number>();
+    /** 다음에 만들 대기열 항목의 번호입니다. queueId는 q1, q2, ...로 매장 안에서 올라갑니다. */
+    private nextQueueNumber = 1;
 
     constructor(private readonly library: Library, options: StoreOptions) {
         this.password = options.password;
@@ -98,5 +104,58 @@ export class Store {
     search(query: string, limit: number, offset: number): { total: number; tracks: TrackWithStatus[] } {
         const { total, tracks } = this.library.search(query, limit, offset);
         return { total, tracks: tracks.map(track => this.withStatus(track)) };
+    }
+
+    /** 이 고객이 신청한 곡이 대기열에 있는지 확인합니다. 재생 중인 곡은 대기 중으로 보지 않습니다. */
+    private hasPendingRequest(clientId: string): boolean {
+        return this.queue.some(entry => entry.clientId === clientId);
+    }
+
+    /** GET /me: 이 고객이 지금 곡을 신청할 수 있는지 알려줍니다. */
+    getMe(clientId: string): { canRequest: boolean; reason: 'MY_REQUEST_PENDING' | null } {
+        return this.hasPendingRequest(clientId)
+            ? { canRequest: false, reason: 'MY_REQUEST_PENDING' }
+            : { canRequest: true, reason: null };
+    }
+
+    /**
+     * POST /queue: 곡을 대기열에 신청합니다.
+     * 명세의 순서대로 검사하고, 모두 통과했을 때만 마지막에 대기열을 바꿉니다.
+     * 검사와 변경 사이에 await가 없으므로 다른 요청이 끼어들 수 없습니다.
+     */
+    enqueue(clientId: string, spotifyId: string): QueueItemView {
+        // ---- 검사 ----
+        const track = this.library.get(spotifyId);
+        if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
+        if (!this.catalogIds.has(spotifyId)) {
+            throw new ApiError(403, 'OUT_OF_MOOD', '현재 기준점의 범위를 벗어난 곡입니다.');
+        }
+        const status = this.statusOf(track);
+        if (status === 'now-playing' || status === 'already-queued') {
+            throw new ApiError(409, 'TRACK_ALREADY_QUEUED', '이미 대기열에 있거나 재생 중인 곡입니다.');
+        }
+        if (status === 'recently-played') {
+            const availableAt = this.playedAt.get(spotifyId)! + this.trackCooldownMs;
+            const retryAfterSec = Math.max(1, Math.ceil((availableAt - this.now()) / 1000));
+            throw new ApiError(429, 'TRACK_COOLDOWN', '최근에 재생된 곡입니다.', retryAfterSec);
+        }
+        if (this.hasPendingRequest(clientId)) {
+            throw new ApiError(409, 'MY_REQUEST_PENDING', '이미 대기열에 신청한 곡이 있습니다.');
+        }
+
+        // ---- 변경 ----
+        const entry: QueueEntry = {
+            queueId: `q${this.nextQueueNumber++}`,
+            track,
+            requestedAt: this.now(),
+            clientId,
+        };
+        this.queue.push(entry);
+        return {
+            queueId: entry.queueId,
+            track: this.withStatus(track),
+            requestedAt: entry.requestedAt,
+            mine: true,
+        };
     }
 }
