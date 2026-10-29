@@ -1,13 +1,13 @@
 import express from 'express';
 import cors from 'cors';
-import { library } from './library.js';
+import { trackLibrary } from './trackLibrary.js';
 import { errorHandler, resolveStore } from './middleware.js';
 import { storeRouter } from './routes/storeRouter.js';
 import { Store } from './store.js';
 
 /**
  * STORES 환경변수(JSON, 예: {"1":"1234"})로 매장 목록을 만듭니다. 설정이 없으면 매장 1(비밀번호 1234)을 사용합니다.
- * 곡 쿨타임은 TRACK_COOLDOWN_MIN 환경변수(분)로 정하며, 설정이 없으면 30분입니다. 모든 매장이 같은 Library를 공유합니다.
+ * 곡 쿨타임은 TRACK_COOLDOWN_MIN 환경변수(분)로 정하며, 설정이 없으면 30분입니다. 모든 매장이 같은 trackLibrary를 공유합니다.
  */
 function loadStores(): ReadonlyMap<string, Store> {
     const passwords = JSON.parse(process.env.STORES ?? '{"1":"1234"}') as Record<string, string>;
@@ -18,7 +18,7 @@ function loadStores(): ReadonlyMap<string, Store> {
     return new Map(
         Object.entries(passwords).map(([id, password]): [string, Store] => [
             id,
-            new Store(library, { password, trackCooldownMs: cooldownMin * 60_000 }),
+            new Store(trackLibrary, { password, trackCooldownMs: cooldownMin * 60_000 }),
         ]),
     );
 }

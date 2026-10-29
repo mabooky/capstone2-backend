@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { ApiError } from './errors.js';
-import type { Library } from './library.js';
+import type { TrackLibrary } from './trackLibrary.js';
 import type { RequestStatus, Track, TrackWithStatus } from './models/track.js';
 
 /** 기준점에서 n을 따로 지정하지 않았을 때의 곡 수입니다. */
@@ -62,12 +62,12 @@ export class Store {
     /** 현재 유효한 관리자 토큰입니다. 매장당 하나만 유지하므로 새로 로그인하면 이전 토큰은 무효가 됩니다. */
     private adminToken: string | null = null;
 
-    constructor(private readonly library: Library, options: StoreOptions) {
+    constructor(private readonly trackLibrary: TrackLibrary, options: StoreOptions) {
         this.password = options.password;
         this.trackCooldownMs = options.trackCooldownMs;
         this.now = options.now ?? Date.now;
         this.random = options.random ?? Math.random;
-        this.catalog = library.nearest(this.mood.valence, this.mood.arousal, this.mood.n);
+        this.catalog = trackLibrary.nearest(this.mood.valence, this.mood.arousal, this.mood.n);
         this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
     }
 
@@ -97,7 +97,7 @@ export class Store {
             throw new ApiError(400, 'INVALID_INPUT', `n은 1 이상 ${MAX_N} 이하의 정수여야 합니다.`);
         }
         this.mood = { valence, arousal, n };
-        this.catalog = this.library.nearest(valence, arousal, n);
+        this.catalog = this.trackLibrary.nearest(valence, arousal, n);
         this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
         return this.getCatalog();
     }
@@ -110,7 +110,7 @@ export class Store {
         if (!Number.isInteger(n) || n < 1 || n > MAX_N) {
             throw new ApiError(400, 'INVALID_INPUT', `n은 1 이상 ${MAX_N} 이하의 정수여야 합니다.`);
         }
-        return this.library.nearest(valence, arousal, n);
+        return this.trackLibrary.nearest(valence, arousal, n);
     }
 
     /** DELETE /admin/queue/:queueId: 대기열에서 곡을 제거합니다. 재생된 것이 아니므로 곡 쿨타임은 적용하지 않습니다. */
@@ -173,7 +173,7 @@ export class Store {
         if (!Number.isInteger(offset) || offset < 0) {
             throw new ApiError(400, 'INVALID_INPUT', 'offset은 0 이상의 정수여야 합니다.');
         }
-        const { total, tracks } = this.library.search(query, limit, offset);
+        const { total, tracks } = this.trackLibrary.search(query, limit, offset);
         return { total, tracks: tracks.map(track => this.withStatus(track)) };
     }
 
@@ -196,7 +196,7 @@ export class Store {
      */
     enqueue(clientId: string, spotifyId: string): QueueEntry {
         // ---- 검사 ----
-        const track = this.library.get(spotifyId);
+        const track = this.trackLibrary.get(spotifyId);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
         if (!this.catalogIds.has(spotifyId)) {
             throw new ApiError(403, 'OUT_OF_MOOD', '현재 기준점의 범위를 벗어난 곡입니다.');
@@ -236,7 +236,7 @@ export class Store {
      */
     reportNowPlaying(spotifyId: string): NowPlayingEntry {
         // ---- 검사 ----
-        const track = this.library.get(spotifyId);
+        const track = this.trackLibrary.get(spotifyId);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
 
         let source: PlaySource;

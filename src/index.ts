@@ -1,11 +1,11 @@
-// 환경변수를 읽는 이 줄이 library.js(DB 접속)를 불러오는 app.js보다 먼저 와야 합니다.
+// 환경변수를 읽는 이 줄이 trackLibrary.js(DB 접속)를 불러오는 app.js보다 먼저 와야 합니다.
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
-import { library } from './library.js';
+import { trackLibrary } from './trackLibrary.js';
 
-// library.js를 import하는 시점에 이미 library 초기화가 완료되어 있음
-console.log(`곡 ${library.size}개를 불러왔습니다.`);
+// trackLibrary.js를 import하는 시점에 이미 trackLibrary 초기화가 완료되어 있음
+console.log(`곡 ${trackLibrary.size}개를 불러왔습니다.`);
 
 const app = createApp();
 const httpServer = createServer(app);

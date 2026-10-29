@@ -5,7 +5,7 @@ export type RequestStatus =
     | 'now-playing'
     | 'recently-played';
 
-/** 곡 그 자체입니다. 전체 곡을 담은 Library가 이 형태로 돌려줍니다. */
+/** 곡 그 자체입니다. 전체 곡을 담은 trackLibrary가 이 형태로 돌려줍니다. */
 export type Track = {
     spotifyId: string;
     title: string;

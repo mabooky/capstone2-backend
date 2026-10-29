@@ -12,7 +12,7 @@ interface TrackRow {
 }
 
 /**
- * 이 모듈을 처음 불러올 때 DB의 songs 테이블을 한 번 읽어 library를 만듭니다. 이후에는 바뀌지 않습니다.
+ * 이 모듈을 처음 불러올 때 DB의 songs 테이블을 한 번 읽어 trackLibrary를 만듭니다. 이후에는 바뀌지 않습니다.
  * DATABASE_URL이 필요하므로, 환경변수를 읽는 dotenv/config를 이 모듈보다 먼저 불러와야 합니다.
  */
 async function readRows(): Promise<TrackRow[]> {
@@ -56,7 +56,7 @@ const arousals = Float64Array.from(tracks, track => track.arousal);
 const searchTexts = tracks.map(track => `${track.title}\n${track.artist}`.toLowerCase());
 
 /** 전체 곡을 메모리에 올려 두고 조회하는 도구입니다. */
-export const library = {
+export const trackLibrary = {
     size: tracks.length,
 
     get(spotifyId: string): Track | undefined {
@@ -93,4 +93,4 @@ export const library = {
     },
 };
 
-export type Library = typeof library;
+export type TrackLibrary = typeof trackLibrary;
