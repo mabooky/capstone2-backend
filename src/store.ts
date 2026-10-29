@@ -3,6 +3,11 @@ import { ApiError } from './errors.js';
 import type { Library } from './library.js';
 import type { RequestStatus, Track, TrackWithStatus } from './models/track.js';
 
+/** 기준점에서 n을 따로 지정하지 않았을 때의 곡 수입니다. */
+const DEFAULT_N = 100;
+/** 카탈로그에 담을 수 있는 곡 수의 상한입니다. */
+const MAX_N = 100;
+
 export type Mood = { valence: number; arousal: number; n: number };
 
 type PlaySource = 'request' | 'fallback';
@@ -44,7 +49,7 @@ export class Store {
     private readonly now: () => number;
     private readonly random: () => number;
 
-    private mood: Mood = { valence: 0, arousal: 0, n: 100 };
+    private mood: Mood = { valence: 0, arousal: 0, n: DEFAULT_N };
     /** 기준점에서 가까운 n곡입니다. 기준점이 바뀔 때마다 새로 만들어집니다. */
     private catalog: Track[];
     private catalogIds: Set<string>;
@@ -84,12 +89,12 @@ export class Store {
      * PUT /admin/mood: 기준점을 통째로 교체하고 새 카탈로그를 돌려줍니다.
      * 이미 대기열에 들어간 곡과 재생 기록은 그대로 유지합니다.
      */
-    setMood(valence: number, arousal: number, n: number): TrackWithStatus[] {
+    setMood(valence: number, arousal: number, n: number = DEFAULT_N): TrackWithStatus[] {
         if (!(valence >= -1 && valence <= 1) || !(arousal >= -1 && arousal <= 1)) {
             throw new ApiError(400, 'INVALID_INPUT', 'valence와 arousal은 -1 이상 1 이하여야 합니다.');
         }
-        if (!Number.isInteger(n) || n < 1 || n > 100) {
-            throw new ApiError(400, 'INVALID_INPUT', 'n은 1 이상 100 이하의 정수여야 합니다.');
+        if (!Number.isInteger(n) || n < 1 || n > MAX_N) {
+            throw new ApiError(400, 'INVALID_INPUT', `n은 1 이상 ${MAX_N} 이하의 정수여야 합니다.`);
         }
         this.mood = { valence, arousal, n };
         this.catalog = this.library.nearest(valence, arousal, n);
@@ -98,12 +103,12 @@ export class Store {
     }
 
     /** GET /admin/mood/preview: 기준점을 바꾸지 않고, 해당 좌표에서 가까운 곡을 미리 조회합니다. */
-    getPreview(valence: number, arousal: number, n: number): Track[] {
+    getPreview(valence: number, arousal: number, n: number = DEFAULT_N): Track[] {
         if (!(valence >= -1 && valence <= 1) || !(arousal >= -1 && arousal <= 1)) {
             throw new ApiError(400, 'INVALID_INPUT', 'valence와 arousal은 -1 이상 1 이하여야 합니다.');
         }
-        if (!Number.isInteger(n) || n < 1 || n > 100) {
-            throw new ApiError(400, 'INVALID_INPUT', 'n은 1 이상 100 이하의 정수여야 합니다.');
+        if (!Number.isInteger(n) || n < 1 || n > MAX_N) {
+            throw new ApiError(400, 'INVALID_INPUT', `n은 1 이상 ${MAX_N} 이하의 정수여야 합니다.`);
         }
         return this.library.nearest(valence, arousal, n);
     }
@@ -158,7 +163,16 @@ export class Store {
     }
 
     /** GET /search: 전체 곡에서 검색하고, 카탈로그 밖의 곡에는 out-of-mood 상태가 붙습니다. */
-    search(query: string, limit: number, offset: number): { total: number; tracks: TrackWithStatus[] } {
+    search(query: string, limit: number = 20, offset: number = 0): { total: number; tracks: TrackWithStatus[] } {
+        if (query.trim() === '') {
+            throw new ApiError(400, 'INVALID_INPUT', 'q는 비어 있을 수 없습니다.');
+        }
+        if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+            throw new ApiError(400, 'INVALID_INPUT', 'limit은 1 이상 50 이하의 정수여야 합니다.');
+        }
+        if (!Number.isInteger(offset) || offset < 0) {
+            throw new ApiError(400, 'INVALID_INPUT', 'offset은 0 이상의 정수여야 합니다.');
+        }
         const { total, tracks } = this.library.search(query, limit, offset);
         return { total, tracks: tracks.map(track => this.withStatus(track)) };
     }
