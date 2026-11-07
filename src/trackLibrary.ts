@@ -1,7 +1,7 @@
 import pg from 'pg';
 import type { Track } from './models/track.js';
 
-/** tracks가 아니라 songs 테이블에서 읽는 한 줄입니다. */
+/** tracks_v3 테이블에서 읽는 한 줄입니다. valence와 energy는 ReccoBeats 원본 값([0, 1])입니다. */
 interface TrackRow {
     spotify_id: string;
     title: string;
@@ -12,7 +12,7 @@ interface TrackRow {
 }
 
 /**
- * 이 모듈을 처음 불러올 때 DB의 songs 테이블을 한 번 읽어 trackLibrary를 만듭니다. 이후에는 바뀌지 않습니다.
+ * 이 모듈을 처음 불러올 때 DB의 tracks_v3 테이블을 한 번 읽어 trackLibrary를 만듭니다. 이후에는 바뀌지 않습니다.
  * DATABASE_URL이 필요하므로, 환경변수를 읽는 dotenv/config를 이 모듈보다 먼저 불러와야 합니다.
  */
 async function readRows(): Promise<TrackRow[]> {
@@ -28,8 +28,8 @@ async function readRows(): Promise<TrackRow[]> {
     });
     try {
         await client.connect();
-        // note: 본래 테이블 이름을 tracks로 해야했으나 songs로 생성함
-        const result = await client.query('SELECT spotify_id, title, artist, duration_ms, valence, energy FROM songs');
+        // 한국 재생 불가 곡(kr_available = false)도 걸러내지 않고 모두 불러옵니다.
+        const result = await client.query('SELECT spotify_id, title, artist, duration_ms, valence, energy FROM tracks_v3');
         return result.rows as TrackRow[];
     } catch (error) {
         throw new Error('곡 데이터를 불러오지 못했습니다.', { cause: error });
@@ -47,8 +47,9 @@ const tracks: Track[] = (await readRows())
         artist: row.artist,
         duration: row.duration_ms,
         albumImageUrl: '',
-        valence: Number(row.valence),
-        arousal: Number(row.energy),
+        // tracks_v3는 [0, 1] 원본 값을 저장하므로, 이 프로젝트의 좌표계 [-1, 1]로 여기서 한 번만 바꿉니다.
+        valence: 2 * Number(row.valence) - 1,
+        arousal: 2 * Number(row.energy) - 1,
     }));
 const byId = new Map(tracks.map(track => [track.spotifyId, track]));
 const valences = Float64Array.from(tracks, track => track.valence);
