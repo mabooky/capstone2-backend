@@ -32,10 +32,11 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
 };
 
 /** :storeId에 해당하는 매장을 찾아 res.locals.store에 담습니다. 매장이 없으면 404 STORE_NOT_FOUND를 반환합니다. */
-export function resolveStore(stores: ReadonlyMap<string, Store>): RequestHandler {
+export function resolveStore(stores: readonly Store[]): RequestHandler {
+    const storeById = new Map(stores.map(store => [store.id, store]));
     return (req, res, next) => {
         const storeId = req.params.storeId;
-        const store = typeof storeId === 'string' ? stores.get(storeId) : undefined;
+        const store = typeof storeId === 'string' ? storeById.get(storeId) : undefined;
         if (store === undefined) {
             throw new ApiError(404, 'STORE_NOT_FOUND', '등록되지 않은 매장입니다.');
         }

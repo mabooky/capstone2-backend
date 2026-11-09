@@ -3,28 +3,33 @@ import cors from 'cors';
 import { trackLibrary } from './trackLibrary.js';
 import { errorHandler, resolveStore } from './middleware.js';
 import { storeRouter } from './routes/storeRouter.js';
+import { findAllStores } from './db/storeRepository.js';
 import { Store } from './store.js';
 
 /**
- * STORES 환경변수(JSON, 예: {"1":"1234"})로 매장 목록을 만듭니다. 설정이 없으면 매장 1(비밀번호 1234)을 사용합니다.
- * 곡 쿨타임은 TRACK_COOLDOWN_MIN 환경변수(분)로 정하며, 설정이 없으면 30분입니다. 모든 매장이 같은 trackLibrary를 공유합니다.
+ * 등록된 매장마다 Store 객체를 만듭니다. 모든 매장이 같은 trackLibrary를 공유하며,
+ * 곡 쿨타임은 TRACK_COOLDOWN_MIN 환경변수(분)로 정합니다. 설정이 없으면 30분입니다.
+ * 시작할 때 한 번만 만들므로 매장을 추가하면 서버를 재시작해야 합니다. 등록된 매장이 없으면 오류를 던집니다.
  */
-function loadStores(): ReadonlyMap<string, Store> {
-    const passwords = JSON.parse(process.env.STORES ?? '{"1":"1234"}') as Record<string, string>;
+async function createStores(): Promise<Store[]> {
+    // 환경변수에서 설정한 곡 쿨타임을 불러와 Store 객체에 주입
     const cooldownMin = Number(process.env.TRACK_COOLDOWN_MIN ?? 30);
     if (!Number.isFinite(cooldownMin) || cooldownMin < 0) {
         throw new Error('TRACK_COOLDOWN_MIN은 0 이상의 숫자여야 합니다.');
     }
-    return new Map(
-        Object.entries(passwords).map(([id, password]): [string, Store] => [
-            id,
-            new Store(trackLibrary, { password, trackCooldownMs: cooldownMin * 60_000 }),
-        ]),
-    );
+
+    const records = await findAllStores();
+    if (records.length === 0) {
+        throw new Error('등록된 매장이 없습니다. node --env-file=.env scripts/stores.mjs add <이름> --yes 로 매장을 등록해 주십시오.');
+    }
+    return records.map(record => new Store(
+        trackLibrary, 
+        { ...record, trackCooldownMs: cooldownMin * 60_000 }
+    ));
 }
 
-export function createApp() {
-    const stores = loadStores();
+export async function createApp() {
+    const stores = await createStores();
 
     const app = express();
     app.use(cors());

@@ -2,12 +2,13 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
+import { closePool } from './db/connectionPool.js';
 import { trackLibrary } from './trackLibrary.js';
 
 // trackLibrary.js를 import하는 시점에 이미 trackLibrary 초기화가 완료되어 있음
 console.log(`곡 ${trackLibrary.size}개를 불러왔습니다.`);
 
-const app = createApp();
+const app = await createApp();
 const httpServer = createServer(app);
 
 const PORT = process.env.PORT || 3000;
@@ -17,6 +18,8 @@ httpServer.listen(PORT, () => {
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
-        httpServer.close();
+        httpServer.close(() => {
+            void closePool();
+        });
     });
 }

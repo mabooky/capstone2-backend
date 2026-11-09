@@ -33,7 +33,10 @@ export type StoreState = {
 };
 
 export interface StoreOptions {
-    password: string;
+    id: string;
+    name: string;
+    /** `scrypt$N$r$p$salt$hash` 형식의 관리자 비밀번호 해시입니다. */
+    adminPasswordHash: string;
     /** 곡이 재생되기 시작한 뒤 다시 신청할 수 없는 시간(ms)입니다. */
     trackCooldownMs: number;
     /** 현재 시각(epoch ms)을 돌려주는 함수입니다. 시간에 의존하는 동작을 테스트할 때 활용할 수 있습니다. */
@@ -53,7 +56,9 @@ function hashCatalog(catalog: Track[]): string {
  * 이 클래스의 메서드는 모두 동기로 유지합니다.
  */
 export class Store {
-    readonly password: string;
+    readonly id: string;
+    readonly name: string;
+    readonly adminPasswordHash: string;
     private readonly trackCooldownMs: number;
     private readonly now: () => number;
     private readonly random: () => number;
@@ -75,7 +80,9 @@ export class Store {
     private adminToken: string | null = null;
 
     constructor(private readonly trackLibrary: TrackLibrary, options: StoreOptions) {
-        this.password = options.password;
+        this.id = options.id;
+        this.name = options.name;
+        this.adminPasswordHash = options.adminPasswordHash;
         this.trackCooldownMs = options.trackCooldownMs;
         this.now = options.now ?? Date.now;
         this.random = options.random ?? Math.random;
@@ -84,11 +91,8 @@ export class Store {
         this.catalogHash = hashCatalog(this.catalog);
     }
 
-    /** POST /admin/login: 비밀번호가 맞으면 새 토큰을 발급하고, 이전에 발급한 토큰은 무효로 만듭니다. */
-    login(password: string): string {
-        if (password !== this.password) {
-            throw new ApiError(401, 'INVALID_CREDENTIALS', '비밀번호가 올바르지 않습니다.');
-        }
+    /** 새 관리자 토큰을 발급하고, 이전에 발급한 토큰은 무효로 만듭니다. 비밀번호 확인은 호출하는 쪽에서 마쳐야 합니다. */
+    issueAdminToken(): string {
         this.adminToken = randomUUID();
         return this.adminToken;
     }
