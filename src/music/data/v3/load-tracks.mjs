@@ -26,7 +26,7 @@
 //
 // 시드 CSV의 아티스트 ID는 22자 ID, spotify:artist:ID, 아티스트 페이지 링크를 받으며 빈 행은 건너뜁니다.
 //
-// 환경변수: DATABASE_URL(없으면 미리보기만 가능), DATABASE_SSL=false, RECCOBEATS_API_BASE_URL
+// 환경변수: DATABASE_URL(없으면 미리보기만 가능), DATABASE_SSL=false
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -38,7 +38,7 @@ const DEFAULT_SEED_CSV = resolve(HERE, 'seed-artists.csv');
 const LOCAL_DIR = resolve(HERE, '../../.local/v3');
 const DEFAULT_TRACKS_FILE = resolve(LOCAL_DIR, 'collected-tracks.json');
 const DEFAULT_FEATURES_FILE = resolve(LOCAL_DIR, 'audio-features.jsonl');
-const API_BASE_URL = process.env.RECCOBEATS_API_BASE_URL ?? 'https://api.reccobeats.com/v1';
+const API_BASE_URL = 'https://api.reccobeats.com/v1';
 const TABLE = 'tracks_v3';
 
 const TRACK_BATCH_SIZE = 40; // ids 쿼리로 한 번에 조회할 수 있는 최대 개수
