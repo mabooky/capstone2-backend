@@ -38,3 +38,27 @@ CREATE TABLE IF NOT EXISTS stores (
     admin_password_hash text NOT NULL, -- scrypt$N$r$p$salt$hash
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- 사용자. 로그인 방식과 무관한 서비스 내부의 계정입니다.
+CREATE TABLE IF NOT EXISTS users (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    nickname text NOT NULL CHECK (btrim(nickname) <> '' AND char_length(nickname) <= 50),
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 사용자와 외부 로그인 계정의 연결. 같은 계정으로 다시 로그인하면 이 행으로 사용자를 찾습니다.
+CREATE TABLE IF NOT EXISTS auth_identities (
+    provider text NOT NULL CHECK (btrim(provider) <> ''), -- 예: kakao
+    provider_user_id text NOT NULL CHECK (btrim(provider_user_id) <> ''), -- 제공자가 부여한 회원 번호
+    user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (provider, provider_user_id)
+);
+
+-- 로그인 세션. 토큰 원문은 저장하지 않고 SHA-256 해시만 저장합니다.
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash bytea PRIMARY KEY CHECK (octet_length(token_hash) = 32),
+    user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL
+);
