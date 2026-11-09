@@ -1,5 +1,14 @@
 import { pool } from './connectionPool.js';
-import type { TrackRow } from '../trackLibraryData.js';
+
+/** tracks_v3 테이블에서 읽는 한 줄입니다. valence와 energy는 ReccoBeats 원본 값([0, 1])입니다. */
+export interface TrackRow {
+    spotify_id: string;
+    title: string;
+    artist: string;
+    duration_ms: number;
+    valence: number;
+    energy: number;
+}
 
 /**
  * tracks_v3의 모든 곡을 읽습니다. 한국 재생 불가 곡(kr_available = false)도 걸러내지 않습니다.

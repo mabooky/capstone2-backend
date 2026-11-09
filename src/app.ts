@@ -1,9 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import { trackLibrary } from './trackLibrary.js';
+import { createTrackLibrary, type TrackLibrary } from './trackLibrary.js';
 import { errorHandler, resolveStore } from './middleware.js';
 import { storeRouter } from './routes/storeRouter.js';
 import { findAllStores } from './db/storeRepository.js';
+import { findAllTracks } from './db/trackRepository.js';
 import { Store } from './store.js';
 
 /**
@@ -11,7 +12,7 @@ import { Store } from './store.js';
  * 곡 쿨타임은 TRACK_COOLDOWN_MIN 환경변수(분)로 정합니다. 설정이 없으면 30분입니다.
  * 시작할 때 한 번만 만들므로 매장을 추가하면 서버를 재시작해야 합니다. 등록된 매장이 없으면 오류를 던집니다.
  */
-async function createStores(): Promise<Store[]> {
+async function createStores(trackLibrary: TrackLibrary): Promise<Store[]> {
     // 환경변수에서 설정한 곡 쿨타임을 불러와 Store 객체에 주입
     const cooldownMin = Number(process.env.TRACK_COOLDOWN_MIN ?? 30);
     if (!Number.isFinite(cooldownMin) || cooldownMin < 0) {
@@ -29,7 +30,9 @@ async function createStores(): Promise<Store[]> {
 }
 
 export async function createApp() {
-    const stores = await createStores();
+    const globalTrackLibrary = createTrackLibrary(await findAllTracks());
+    console.log(`곡 ${globalTrackLibrary.size}개를 불러왔습니다.`);
+    const stores = await createStores(globalTrackLibrary);
 
     const app = express();
     app.use(cors());

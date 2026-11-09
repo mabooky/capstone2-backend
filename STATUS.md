@@ -36,7 +36,7 @@ A 영역 추천·Store·기존 매장 HTTP 연동을 구현하고 합성 데이�
 
 | 영역 | 확인 사실 |
 |---|---|
-| 곡 라이브러리 | 시작/import 시 PostgreSQL `tracks_v3` 전체 조회. ReccoBeats V/E를 `[-1,1]`로 변환하고 조회·검색·최근접 제공 |
+| 곡 라이브러리 | 시작 시 PostgreSQL `tracks_v3` 전체 조회(`trackRepository`). ReccoBeats V/E를 `[-1,1]`로 변환하고 조회·검색·최근접 제공 |
 | 매장 서비스 | 단일 기준점, 최근접 카탈로그(기본 100·최대 100), 대기열·신청 제한·쿨타임·재생 보고·자동선곡·매장별 관리자 세션 구현 |
 | 공개 API | `/api/stores/:storeId` 아래 GET `/mood`, `/catalog`, `/search`, `/state`, `/me`, POST `/queue`; 별도 GET `/api/health` |
 | 관리자 API | POST `/admin/login`, PUT `/admin/mood`, GET `/admin/mood/preview`, GET `/admin/fallback-track`, PUT `/admin/now-playing`, DELETE `/admin/queue/:queueId` |
@@ -83,7 +83,7 @@ A 영역 추천·Store·기존 매장 HTTP 연동을 구현하고 합성 데이�
 ## 이번 영역 추천 구현과 검증
 
 - `src/catalogRecommendation.ts`: A 모델 좌표 기반 Hull·원형 버퍼·사각형·퇴화 영역·중복 제거·필수 기준곡·Fisher–Yates 추출/결과 셔플.
-- `src/trackLibraryData.ts`: 기존 메모리 라이브러리 구성을 DB 로딩에서 분리해 합성 행으로 검증한다.
+- `src/trackLibrary.ts`: DB 조회(`src/db/trackRepository.ts`)와 분리된 메모리 라이브러리 구성으로, 합성 행으로 검증한다.
   SQL과 DB 연결 경로는 유지하며 null·빈 문자열 등 무효 좌표를 정상 좌표로 바꾸지 않는다.
 - Store에 영역 설정·미리보기 내부 호출을 연결했다. 갱신 전 검증·추출을 완료하므로 실패 시 상태를 보존한다.
   대기열·재생·쿨타임·인증 정책은 유지한다. 기존 PUT/GET 미리보기에서 mode로 영역 입력을 분기한다.
