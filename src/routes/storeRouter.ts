@@ -20,9 +20,9 @@ storeRouter.get('/search', (req, res) => {
 });
 
 // X-Client-Id는 선택입니다. 없으면 모든 항목의 mine이 false입니다.
-storeRouter.get('/queue', (req, res) => {
+storeRouter.get('/state', (req, res) => {
     const clientId = req.get('X-Client-Id')?.trim() || undefined;
-    res.json(res.locals.store.getQueue(clientId));
+    res.json(res.locals.store.getState(clientId));
 });
 
 storeRouter.post('/queue', requireClientId, (req, res) => {

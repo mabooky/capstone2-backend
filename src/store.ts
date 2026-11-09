@@ -21,8 +21,8 @@ export type QueueEntry = { queueId: string; track: Track; requestedAt: number; m
 /** 재생 중인 곡입니다. 저장 모양과 응답 모양이 같습니다. */
 export type NowPlayingEntry = { track: Track; startedAt: number; source: PlaySource };
 
-/** GET /queue 응답의 모양입니다. */
-export type QueueSnapshot = {
+/** GET /state 응답의 모양입니다. */
+export type StoreState = {
     serverTime: number;
     nowPlaying: NowPlayingEntry | null;
     queue: QueueEntry[];
@@ -144,8 +144,8 @@ export class Store {
         return this.catalog.map(track => this.withStatus(track));
     }
 
-    /** GET /queue: 재생 중인 곡과 대기열 전체입니다. clientId가 신청한 곡에는 mine이 true입니다. */
-    getQueue(clientId?: string): QueueSnapshot {
+    /** GET /state: 재생 중인 곡과 대기열 전체입니다. clientId가 신청한 곡에는 mine이 true입니다. */
+    getState(clientId?: string): StoreState {
         return {
             serverTime: this.now(),
             nowPlaying: this.nowPlaying && {
