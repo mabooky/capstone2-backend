@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createTrackLibrary, type TrackLibrary } from './trackLibrary.js';
 import { errorHandler, resolveStore } from './middleware.js';
+import { authRouter } from './routes/authRouter.js';
 import { storeRouter } from './routes/storeRouter.js';
 import { findAllStores } from './db/storeRepository.js';
 import { findAllTracks } from './db/trackRepository.js';
@@ -44,6 +45,7 @@ export async function createApp() {
         res.status(200).json({ status: 'ok', timestamp: Date.now() });
     });
 
+    app.use('/api/auth', authRouter);
     app.use('/api/stores/:storeId', resolveStore(stores), storeRouter);
 
     app.use(errorHandler);
