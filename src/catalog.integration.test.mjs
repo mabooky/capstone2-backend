@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createTrackLibrary } from './trackLibrary.js';
 import { Store } from './store.js';
+import { hashPassword } from './auth/password.js';
 import { storeRouter } from './routes/storeRouter.js';
 import { resolveStore, errorHandler } from './middleware.js';
 
@@ -11,7 +12,8 @@ const row = (n, v, e) => ({spotify_id:id(n),title:`Track ${n}`,artist:'Artist',d
 const rows = [row(1,.5,.5),row(2,.6,.5),row(3,.5,.6),row(4,.55,.55),row(5,1,1)];
 const range = {mode:'range',valenceMin:-.1,valenceMax:.3,energyMin:-.1,energyMax:.3,n:100};
 const seedRequest = {mode:'seeds',spotifyIds:[id(1),id(2),id(3)],n:4};
-const makeStore = () => new Store(createTrackLibrary(rows), {password:'synthetic-test',trackCooldownMs:1000,now:()=>500,random:()=>.25});
+const adminPasswordHash = await hashPassword('synthetic-test');
+const makeStore = (storeId = 'test') => new Store(createTrackLibrary(rows), {id:storeId,name:'Test',adminPasswordHash,trackCooldownMs:1000,now:()=>500,random:()=>.25});
 
 test('tracks_v3 row mapping normalizes model A exactly once, never converts missing coordinates to -1', () => {
     const source = [row(1,0,1),row(2,.5,.5),row(3,null,.5),row(4,'',.5),row(5,1.1,.5),row(6,'0.75','0.25')];
@@ -26,7 +28,7 @@ test('tracks_v3 row mapping normalizes model A exactly once, never converts miss
 });
 test('Store catalog update preserves queue, playback, cooldown, admin token; failed input is atomic', () => {
     const store = makeStore();
-    const token = store.login('synthetic-test');
+    const token = store.issueAdminToken();
     store.setRegionCatalog(range);
     store.enqueue('client-a',id(1));
     store.reportNowPlaying(id(1));
@@ -71,9 +73,9 @@ test('legacy point defaults, nearest ordering and response shape remain compatib
     assert.equal(store.getRegion(),null);
 });
 test('real production routers: login, catalog, request, state, playback, isolation on synthetic memory library', async t => {
-    const store = makeStore(), other = makeStore();
+    const store = makeStore('one'), other = makeStore('two');
     const app = express(); app.use(express.json());
-    app.use('/api/stores/:storeId',resolveStore(new Map([['one',store],['two',other]])),storeRouter);
+    app.use('/api/stores/:storeId',resolveStore([store,other]),storeRouter);
     app.use(errorHandler);
     const server = app.listen(0,'127.0.0.1');
     await new Promise(resolve=>server.once('listening',resolve));
