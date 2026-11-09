@@ -49,3 +49,8 @@ export async function findOrCreateUser(provider: string, providerUserId: string,
         client.release();
     }
 }
+
+/** 사용자의 닉네임을 바꿉니다. */
+export async function updateNickname(userId: string, nickname: string): Promise<void> {
+    await pool.query('UPDATE users SET nickname = $2 WHERE id = $1', [userId, nickname]);
+}
