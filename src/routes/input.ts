@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.js';
+import { parseCatalogRequest, type CatalogRequest } from '../catalogRecommendation.js';
 
 /** 요청 입력의 형식을 변환하고 확인하는 도구입니다. 값의 범위 같은 의미 검사는 Store가 합니다. */
 
@@ -31,4 +32,16 @@ export function bodyNumber(body: unknown, key: string): number | undefined {
     if (value === undefined) return undefined;
     if (typeof value !== 'number') throw invalid(`${key}의 형식이 올바르지 않습니다.`);
     return value;
+}
+
+/** Same region schema as PUT /admin/mood, with numbers encoded as query strings.
+ * Seed IDs use repeated spotifyIds query parameters (not comma splitting).
+ */
+export function regionQuery(query: Record<string, unknown>): CatalogRequest {
+    const input: Record<string, unknown> = { ...query };
+    for (const key of ['n', 'valenceMin', 'valenceMax', 'energyMin', 'energyMax']) {
+        if (key in input) input[key] = queryNumber(input[key]);
+    }
+    if (typeof input.spotifyIds === 'string') input.spotifyIds = [input.spotifyIds];
+    return parseCatalogRequest(input);
 }

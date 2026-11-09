@@ -3,6 +3,7 @@ import { ApiError } from './errors.js';
 import { murmur3 } from './murmur3.js';
 import type { TrackLibrary } from './trackLibrary.js';
 import type { RequestStatus, Track, TrackWithStatus } from './models/track.js';
+import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './catalogRecommendation.js';
 
 /** 기준점에서 n을 따로 지정하지 않았을 때의 곡 수입니다. */
 const DEFAULT_N = 100;
@@ -58,7 +59,8 @@ export class Store {
     private readonly random: () => number;
 
     private mood: Mood = { valence: 0, arousal: 0, n: DEFAULT_N };
-    /** 기준점에서 가까운 n곡입니다. 기준점이 바뀔 때마다 새로 만들어집니다. */
+    private region: CatalogRequest | null = null;
+    /** Active sampled region catalog, or the temporary legacy point catalog. */
     private catalog: Track[];
     private catalogIds: Set<string>;
     /** 카탈로그의 곡 목록(순서 포함)에서 계산한 8자리 16진수 해시입니다. 목록이 같으면 같은 값입니다. */
@@ -108,10 +110,30 @@ export class Store {
             throw new ApiError(400, 'INVALID_INPUT', `n은 1 이상 ${MAX_N} 이하의 정수여야 합니다.`);
         }
         this.mood = { valence, arousal, n };
+        this.region = null;
         this.catalog = this.trackLibrary.nearest(valence, arousal, n);
         this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
         this.catalogHash = hashCatalog(this.catalog);
         return this.getCatalog();
+    }
+
+    /** Validate and sample before committing any state; queue, playback and cooldowns are retained. */
+    setRegionCatalog(input: CatalogRequest): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithStatus[] } {
+        const request = parseCatalogRequest(input);
+        const result = this.trackLibrary.recommend(request, this.random);
+        this.region = request;
+        this.catalog = result.tracks;
+        this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
+        this.catalogHash = hashCatalog(this.catalog);
+        return { ...result, tracks: this.getCatalog() };
+    }
+
+    getRegionPreview(input: CatalogRequest): CatalogResult {
+        return this.trackLibrary.recommend(input, this.random);
+    }
+
+    getRegion(): CatalogRequest | null {
+        return this.region && parseCatalogRequest(this.region);
     }
 
     /** GET /admin/mood/preview: 기준점을 바꾸지 않고, 해당 좌표에서 가까운 곡을 미리 조회합니다. */
@@ -132,8 +154,10 @@ export class Store {
         this.queue.splice(index, 1);
     }
 
-    getMood(): Mood {
-        return { ...this.mood };
+    getMood(): Mood & { region?: CatalogRequest } {
+        // Preserve the legacy fields; region is the active official configuration when present.
+        const region = this.getRegion();
+        return { ...this.mood, ...(region && { region }) };
     }
 
     /** 곡의 신청 상태를 정합니다. 여러 상태에 해당하면 아래 순서에서 가장 앞선 하나를 돌려줍니다. */
@@ -151,7 +175,7 @@ export class Store {
         return { ...track, requestStatus: this.statusOf(track) };
     }
 
-    /** GET /catalog: 기준점에서 가까운 순서의 카탈로그입니다. */
+    /** GET /catalog: preserves the sampled order, adding only request status. */
     getCatalog(): TrackWithStatus[] {
         return this.catalog.map(track => this.withStatus(track));
     }
