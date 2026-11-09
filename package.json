@@ -14,17 +14,18 @@
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "12.9.1",
+      "version": "12.18.0",
       "onFail": "download"
     }
   },
-  "packageManager": "pnpm@12.9.1",
+  "packageManager": "pnpm@12.18.0",
   "type": "module",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "solapi": "^6.1.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10",
