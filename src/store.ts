@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { ApiError } from './errors.js';
+import { murmur3 } from './murmur3.js';
 import type { TrackLibrary } from './trackLibrary.js';
 import type { RequestStatus, Track, TrackWithStatus } from './models/track.js';
 
@@ -24,6 +25,8 @@ export type NowPlayingEntry = { track: Track; startedAt: number; source: PlaySou
 /** GET /state 응답의 모양입니다. */
 export type StoreState = {
     serverTime: number;
+    /** 현재 카탈로그의 곡 목록에서 계산한 값입니다. 이 값이 바뀌었으면 GET /catalog를 다시 호출해야 합니다. */
+    catalogHash: string;
     nowPlaying: NowPlayingEntry | null;
     queue: QueueEntry[];
 };
@@ -36,6 +39,11 @@ export interface StoreOptions {
     now?: () => number;
     /** 0 이상 1 미만의 난수를 돌려주는 함수입니다. 무작위로 고르는 동작을 테스트할 때 활용할 수 있습니다. */
     random?: () => number;
+}
+
+/** 카탈로그 곡의 spotifyId를 순서대로 쉼표로 이어 해시합니다. (Spotify ID에는 쉼표가 없어서 서로 다른 목록이 같은 문자열이 될 수 없습니다.) */
+function hashCatalog(catalog: Track[]): string {
+    return murmur3(catalog.map(track => track.spotifyId).join(',')).toString(16).padStart(8, '0');
 }
 
 /**
@@ -53,6 +61,8 @@ export class Store {
     /** 기준점에서 가까운 n곡입니다. 기준점이 바뀔 때마다 새로 만들어집니다. */
     private catalog: Track[];
     private catalogIds: Set<string>;
+    /** 카탈로그의 곡 목록(순서 포함)에서 계산한 8자리 16진수 해시입니다. 목록이 같으면 같은 값입니다. */
+    private catalogHash: string;
     private queue: QueueEntryServer[] = [];
     private nowPlaying: NowPlayingEntry | null = null;
     /** 곡별로 마지막에 재생이 시작된 시각입니다. */
@@ -69,6 +79,7 @@ export class Store {
         this.random = options.random ?? Math.random;
         this.catalog = trackLibrary.nearest(this.mood.valence, this.mood.arousal, this.mood.n);
         this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
+        this.catalogHash = hashCatalog(this.catalog);
     }
 
     /** POST /admin/login: 비밀번호가 맞으면 새 토큰을 발급하고, 이전에 발급한 토큰은 무효로 만듭니다. */
@@ -99,6 +110,7 @@ export class Store {
         this.mood = { valence, arousal, n };
         this.catalog = this.trackLibrary.nearest(valence, arousal, n);
         this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
+        this.catalogHash = hashCatalog(this.catalog);
         return this.getCatalog();
     }
 
@@ -148,6 +160,7 @@ export class Store {
     getState(clientId?: string): StoreState {
         return {
             serverTime: this.now(),
+            catalogHash: this.catalogHash,
             nowPlaying: this.nowPlaying && {
                 track: this.nowPlaying.track,
                 startedAt: this.nowPlaying.startedAt,
