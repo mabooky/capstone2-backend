@@ -3,6 +3,8 @@ export type ErrorCode =
     | 'MISSING_CLIENT_ID'
     | 'UNAUTHORIZED'
     | 'INVALID_CREDENTIALS'
+    | 'INVALID_KAKAO_CODE'
+    | 'KAKAO_UNAVAILABLE'
     | 'OUT_OF_MOOD'
     | 'STORE_NOT_FOUND'
     | 'TRACK_NOT_FOUND'
