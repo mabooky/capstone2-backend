@@ -66,7 +66,7 @@ mode별 응답 형식이 다르므로 클라이언트는 자신이 보낸 요청
 
 | 항목 | 내용 |
 |---|---|
-| Base URL | `https://capstone2-backend-production.up.railway.app/api/stores/:storeId`. `:storeId`는 매장(테넌트)의 식별자입니다. 등록되지 않은 `storeId`로 요청하면 404 Not Found(`STORE_NOT_FOUND`)가 반환됩니다. |
+| Base URL | `https://capstone2-backend-production.up.railway.app/api/stores/:storeId`. `:storeId`는 매장(테넌트)의 식별자이며, 매장을 등록할 때 서버가 무작위로 만든 8자 문자열입니다. 등록되지 않은 `storeId`로 요청하면 404 Not Found(`STORE_NOT_FOUND`)가 반환됩니다. |
 | 매장별 독립 동작 | 기준점, 대기열, 재생 상태, 곡 재생 기록, 관리자 세션, 관리자 비밀번호는 모두 매장(`storeId`)별로 독립적으로 동작합니다. 한 매장의 요청은 다른 매장의 상태에 영향을 주지 않습니다. |
 | Content-Type | `application/json` |
 | 좌표 | 모든 `valence`, `arousal` 값은 **[-1, 1]** 범위입니다. 서버와 클라이언트 모두 별도의 변환을 수행하지 않습니다. |
@@ -164,6 +164,15 @@ type NowPlayingEntry = {
 ## 3. 공개 API
 
 공개 API는 관리자 토큰 없이 호출할 수 있으며, 고객 화면과 관리자 화면에서 함께 사용합니다. 고객을 식별하는 `X-Client-Id` 헤더는 필요한 엔드포인트에 한하여 각 항목에 명시되어 있습니다.
+
+### GET /
+
+매장의 식별자와 이름을 반환합니다. 화면에 매장 이름을 표시할 때 사용하며, 관리자 토큰과 `X-Client-Id`는 필요하지 않습니다.
+
+응답 `200 OK`:
+```json
+{ "storeId": "k3m9x2pq", "name": "제주대학교 공과대학4호관 414호" }
+```
 
 ### GET /mood
 

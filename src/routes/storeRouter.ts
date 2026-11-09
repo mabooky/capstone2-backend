@@ -5,6 +5,11 @@ import { bodyString, queryNumber, queryString } from './input.js';
 
 export const storeRouter = express.Router({ mergeParams: true });
 
+storeRouter.get('/', (req, res) => {
+    const store = res.locals.store;
+    res.json({ storeId: store.id, name: store.name });
+});
+
 storeRouter.get('/mood', (req, res) => {
     res.json(res.locals.store.getMood());
 });
