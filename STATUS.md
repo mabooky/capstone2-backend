@@ -7,17 +7,20 @@
 ## 개발 기준과 보존 상태
 
 - 공식 폴더: `C:\Dev\capstone2-backend`.
-- 브랜치: `main`, HEAD `860ada13ef7669eefca67e267e16f3c6824a89e6`.
-  루트 4문서를 추가한 커밋 `860ada13`(`docs: initialize capstone workflow v1.3`)의 push는 완료됐고,
-  이번 확인에서 로컬 `origin/main`과 실제 원격 `main`도 같은 SHA였다.
-  이번 상태 갱신은 `PLAN.md`·`STATUS.md`의 미스테이징·미커밋 변경이며 commit/push는 사용자 담당이다.
-  작업 시작 시 미추적 파일 `07_Main_Development_Workflow_v1.3.md`가 있었으며 그대로 보존했다.
+- 이번 작업 시작 기준 브랜치: `main`, HEAD `0843b3fb77d024b682b506c7cd80e62f5f35598d`.
+  루트 4문서 추가는 `860ada13`, 진행 상태 갱신은 `0843b3f`로 커밋·push 완료했으며,
+  이번 확인에서 실제 원격 `main`도 `0843b3f`였다.
+  작업 시작 시 추적 파일 변경은 없었고 미추적 파일 `07_Main_Development_Workflow_v1.3.md`는 보존·커밋 제외한다.
+- Git 운영 정책: 이 저장소에서 승인된 작업의 정상 완료 시 Codex가 관련 파일만 검토·staging·commit하고,
+  원격 변경·충돌이 없으면 origin에 push하도록 사용자가 지속 승인했다. 매번 재승인을 요청하지 않는다.
+  기존 설계·API/DB·범위 승인 경계와 금지 사항은 유지하며 다른 프로젝트에는 적용하지 않는다.
+  세부 절차는 [AGENTS.md](AGENTS.md)를 따른다.
 - 기존 `feature/music-db`(`24c4142`), `archive/music-research-20261027`(`6eb1f96`),
   stash `891232d23e98d1552829d2ee7eb73bc3706d6e5d`를 보존한다.
 - 백업: `C:\Backups\capstone2\20261109-173314`. 이전 1단계에서 세 clone·Git/stash·
   `.local`·연구 DB/자료 복사와 파일 해시·Git bundle 복구 검사를 완료했다고 보고했다.
 - `.local`에는 비교 이미지 15개(`comparison_all.png` 포함), 실험표·보고서·MuSe/ReccoBeats
-  수집/정제 자료·DB 스냅샷이 있다. 이번에는 `.local`과 이미지 15개의 존재를 확인했으며
+  수집/정제 자료·DB 스냅샷이 있다. 이전 상태 갱신에서 `.local`과 이미지 15개의 존재를 확인했으며
   자료 무결성 해시 검사를 다시 수행하지 않았다.
 - 사용자가 삭제했다고 보고한 두 폴더는 백업 기록의 원래 경로
   `C:\Dev\capstone2-backend-music-slim-20261028`,
@@ -58,7 +61,8 @@
 
 실제 PostgreSQL·매장/관리자 API·프론트엔드·최종 사용 흐름은 미검증이다.
 이전 4단계에서는 문서·코드·Git 기록을 읽고 문서 차이와 변경 범위만 확인했다.
-이번 상태 갱신에서는 Git 상태·관련 경로·문서 diff를 확인했으며 빌드·테스트·DB 검증은 실행하지 않았다.
+이전 상태 갱신에서는 Git 상태·관련 경로·문서 diff를 확인했다.
+이번 Git 운영 정책 변경에서는 문서 내용·diff·Git 상태를 확인하며 빌드·테스트·DB 검증은 실행하지 않는다.
 
 ## 중요한 불일치와 판단 대기
 
@@ -80,5 +84,5 @@
 1. 개발 착수 전 영역·샘플링·카탈로그 갱신·고객 식별/이력의 주요 정책과 API·DB·팀 연동 계약을 검토한다.
 2. PLAN P1의 테스트 정합성/개발 DB 검증 기반과 P2의 정책·계약 합의를 검토하되,
    P1과 P2의 실행 순서는 아직 제안이며 최종 확정되지 않았다. 구현·DB 준비는 별도 승인 범위에 따른다.
-3. 사용자가 이번 `PLAN.md`·`STATUS.md`의 상태 갱신 diff를 확인한 후 직접 commit/push한다.
-   이번 작업에서는 후속 개발을 시작하지 않는다.
+3. 승인된 작업의 정상 완료 후 Codex가 AGENTS의 Git 운영 정책에 따라 commit/push하고 결과를 보고한다.
+   이번 운영 정책 변경에서는 후속 개발을 시작하지 않는다.
