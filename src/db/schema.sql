@@ -10,23 +10,23 @@ CREATE TABLE IF NOT EXISTS tracks_v3 (
     spotify_id text PRIMARY KEY CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
     reccobeats_id uuid NOT NULL,
     title text NOT NULL CHECK (btrim(title) <> ''),
-    artist text NOT NULL CHECK (btrim(artist) <> ''),                       -- 참여 아티스트 이름을 ', '로 이은 문자열
-    artist_reccobeats_ids uuid[] NOT NULL CHECK (cardinality(artist_reccobeats_ids) > 0),  -- artist와 같은 순서
+    artist text NOT NULL CHECK (btrim(artist) <> ''), -- 참여 아티스트 이름을 ', '로 이은 문자열
+    artist_reccobeats_ids uuid[] NOT NULL CHECK (cardinality(artist_reccobeats_ids) > 0), -- artist와 같은 순서
     duration_ms integer NOT NULL CHECK (duration_ms >= 0),
     popularity integer CHECK (popularity BETWEEN 0 AND 100),
     isrc text,
-    kr_available boolean NOT NULL,                                          -- availableCountries에 KR 포함 여부
+    kr_available boolean NOT NULL, -- availableCountries에 KR 포함 여부
     acousticness double precision CHECK (acousticness BETWEEN 0 AND 1),
     danceability double precision CHECK (danceability BETWEEN 0 AND 1),
     energy double precision NOT NULL CHECK (energy BETWEEN 0 AND 1),
     instrumentalness double precision CHECK (instrumentalness BETWEEN 0 AND 1),
     liveness double precision CHECK (liveness BETWEEN 0 AND 1),
-    loudness double precision,                                              -- dB
+    loudness double precision, -- dB
     speechiness double precision CHECK (speechiness BETWEEN 0 AND 1),
-    tempo double precision CHECK (tempo >= 0),                              -- BPM
+    tempo double precision CHECK (tempo >= 0), -- BPM
     valence double precision NOT NULL CHECK (valence BETWEEN 0 AND 1),
-    musical_key smallint CHECK (musical_key BETWEEN -1 AND 11),             -- 0=C, ..., 11=B, -1=감지 실패
-    musical_mode smallint CHECK (musical_mode IN (0, 1))                    -- 0=단조, 1=장조
+    musical_key smallint CHECK (musical_key BETWEEN -1 AND 11), -- 0=C, ..., 11=B, -1=감지 실패
+    musical_mode smallint CHECK (musical_mode IN (0, 1)) -- 0=단조, 1=장조
 );
 
 CREATE INDEX IF NOT EXISTS tracks_v3_artists_idx ON tracks_v3 USING gin (artist_reccobeats_ids);
