@@ -19,14 +19,16 @@ async function createStores(trackLibrary: TrackLibrary): Promise<Store[]> {
         throw new Error('TRACK_COOLDOWN_MIN은 0 이상의 숫자여야 합니다.');
     }
 
-    const records = await findAllStores();
-    if (records.length === 0) {
+    const storeRows = await findAllStores();
+    if (storeRows.length === 0) {
         throw new Error('등록된 매장이 없습니다. node --env-file=.env scripts/stores.mjs add <이름> --yes 로 매장을 등록해 주십시오.');
     }
-    return records.map(record => new Store(
-        trackLibrary, 
-        { ...record, trackCooldownMs: cooldownMin * 60_000 }
-    ));
+    return storeRows.map(row => new Store(trackLibrary, {
+        id: row.id,
+        name: row.name,
+        adminPasswordHash: row.admin_password_hash,
+        trackCooldownMs: cooldownMin * 60_000,
+    }));
 }
 
 export async function createApp() {
