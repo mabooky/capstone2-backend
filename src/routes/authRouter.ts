@@ -1,9 +1,10 @@
 import express from 'express';
 import { fetchKakaoProfile } from '../auth/kakao.js';
 import { SESSION_TTL_MS, generateSessionToken, hashSessionToken } from '../auth/sessionToken.js';
-import { insertSession } from '../db/sessionRepository.js';
+import { deleteSession, insertSession } from '../db/sessionRepository.js';
 import { findOrCreateUser, updateNickname } from '../db/userRepository.js';
 import { bodyString } from './input.js';
+import { requireUser } from '../middleware.js';
 
 export const authRouter = express.Router();
 
@@ -17,4 +18,9 @@ authRouter.post('/kakao/login', async (req, res) => {
     const expiresAt = Date.now() + SESSION_TTL_MS;
     await insertSession(hashSessionToken(token), user.id, new Date(expiresAt));
     res.json({ token, expiresAt, user: { nickname: kakaoProfile.nickname } });
+});
+
+authRouter.post('/logout', requireUser, async (req, res) => {
+    await deleteSession(res.locals.sessionHash);
+    res.status(204).end();
 });
