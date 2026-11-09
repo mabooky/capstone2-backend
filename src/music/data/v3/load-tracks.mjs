@@ -1,38 +1,32 @@
-// 시드 CSV의 아티스트(Spotify 아티스트 ID)에서 출발해, ReccoBeats에서 그 아티스트들의 곡과 오디오 값을 모아 tracks_v3 테이블에 올립니다.
+// 시드 CSV의 아티스트에서 곡과 오디오 값을 수집해 tracks_v3에 적재합니다.
 //
-// 사용법:
 //   node --env-file=.env src/music/data/v3/load-tracks.mjs [옵션]
-//     --yes가 없으면 미리보기만 하고 DB는 바꾸지 않습니다.
 //
-//   --csv <파일>           시드 CSV (장르, 아티스트, 아티스트 Spotify ID). 기본은 같은 폴더의 seed-artists.csv
-//   --genre <장르>         이 장르의 행만 처리
-//   --limit <시드 수>      앞에서부터 이 수만큼만 처리 (시험용)
-//   --top <곡 수>          아티스트당 남길 곡 수 (인기도 높은 순). 기본은 제한 없이 모두 수집합니다.
-//   --show <곡 수>         미리보기에서 아티스트마다 인기도 높은 곡을 이만큼 보여줍니다.
-//   --tracks-file <파일>   수집한 곡 목록(JSON). 기본은 src/music/.local/v3/collected-tracks.json
-//   --features-file <파일> 받은 오디오 값 기록(JSONL). 기본은 src/music/.local/v3/audio-features.jsonl
-//   --yes                  실제로 DB에 올립니다.
+//   --csv <파일>: 시드 CSV(장르, 아티스트, 아티스트 Spotify ID). 기본값은 seed-artists.csv
+//   --genre <장르>: 해당 장르의 시드만 처리
+//   --limit <개수>: 앞에서부터 지정한 수의 시드만 처리
+//   --top <개수>: 아티스트당 인기도 상위 곡만 유지. 기본값은 전체
+//   --show <개수>: 미리보기에서 아티스트별 인기도 상위 곡을 출력
+//   --tracks-file <파일>: 수집한 곡 목록(JSON). 기본값은 src/music/.local/v3/collected-tracks.json
+//   --features-file <파일>: 받은 오디오 값(JSONL). 기본값은 src/music/.local/v3/audio-features.jsonl
+//   --yes: DB에 적재합니다. 지정하지 않으면 DB를 변경하지 않습니다.
 //
-// 진행 순서:
-//   1. 곡 목록 파일이 없으면 시드 CSV의 아티스트를 ReccoBeats에서 찾고(하나라도 못 찾으면 목록을 보여준 뒤 중단),
-//      아티스트마다 곡 전체를 수집해서 곡 목록 파일로 저장합니다. 파일이 이미 있으면 이 단계를 건너뛰고 그 목록을 씁니다.
-//      (--csv, --genre, --limit, --top은 이 단계에서만 쓰입니다. 처음부터 다시 수집하려면 곡 목록 파일을 지우십시오.)
-//   2. 곡들의 오디오 값을 40곡씩 병렬로 받아 오디오 값 기록 파일에 곡마다 한 줄씩 곧바로 덧붙입니다.
-//      이미 기록된 곡은 다시 받지 않으므로 중간에 멈춰도 이어서 받습니다. 한도 초과(429)를 받으면 모든 요청이 함께 쉬고,
-//      진행 상황은 한 줄로 계속 갱신해서 보여줍니다.
-//   3. 오디오 값이 있는 곡만 DB에 올립니다. --yes가 있을 때만 올리며, 올릴 때 schema.sql을 먼저 실행합니다.
+// 단계
+//   1. 수집: 곡 목록 파일이 없으면 시드 아티스트의 곡 전체를 수집해 파일로 저장합니다. 파일이 있으면 이 단계를 건너뛰고
+//      --csv, --genre, --limit, --top을 무시합니다. 다시 수집하려면 파일을 삭제합니다.
+//      시드 아티스트를 ReccoBeats에서 하나라도 찾지 못하면 수집하지 않고 중단합니다.
+//   2. 오디오 값: 40곡 단위로 병렬 요청하고, 받은 즉시 곡마다 한 줄씩 파일에 기록합니다.
+//      기록된 곡은 다시 받지 않으므로 중단된 실행을 이어서 진행할 수 있습니다.
+//   3. 적재: 오디오 값이 있는 곡만 적재합니다. tracks_v3는 src/db/schema.sql로 미리 만들어 두어야 합니다.
 //
-// 저장 방식:
-//   - 오디오 값은 변환 없이 ReccoBeats 응답 값 그대로 올립니다. (valence, energy도 [0, 1]이며, key와 mode 열의 이름만 musical_key, musical_mode입니다.)
-//   - 곡은 거르거나 합치지 않고 모두 올립니다. (한국 재생 불가 곡, 연주곡·MR, 같은 곡의 여러 버전 모두입니다.)
-//     서비스에 무엇을 보여줄지는 조회할 때 정합니다.
-//   - 같은 아티스트가 시드에 여러 번 나와도 한 번만 수집합니다. 이미 DB에 있는 아티스트도 다시 수집합니다.
-//   - 같은 곡(spotify_id)이 이미 있으면 새 행을 만들지 않고, 곡의 아티스트 ID 목록과 오디오 값만 최신 값으로 맞춥니다.
+// 적재 규칙
+//   - 오디오 값은 응답 원본 그대로 저장합니다. key, mode는 musical_key, musical_mode 열에 저장합니다.
+//   - 한국 재생 불가 곡, 연주곡, 같은 곡의 여러 버전도 걸러내거나 합치지 않습니다.
+//   - 같은 spotify_id가 이미 있으면 artist_reccobeats_ids와 오디오 값만 갱신합니다.
 //
-// 시드 CSV의 세 번째 열에는 Spotify 아티스트 ID(22자)를 적습니다. spotify:artist:ID나 아티스트 페이지 링크도 받습니다. 비어 있는 행은 건너뜁니다.
+// 시드 CSV의 아티스트 ID는 22자 ID, spotify:artist:ID, 아티스트 페이지 링크를 받으며 빈 행은 건너뜁니다.
 //
-// 필요한 환경변수: DATABASE_URL (.env 파일에 넣으면 커밋되지 않습니다. 없으면 DB 없이 미리보기만 할 수 있습니다.)
-// 선택 환경변수: DATABASE_SSL=false (로컬이 아닌 DB에 SSL 없이 접속해야 할 때), RECCOBEATS_API_BASE_URL
+// 환경변수: DATABASE_URL(없으면 미리보기만 가능), DATABASE_SSL=false, RECCOBEATS_API_BASE_URL
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -40,24 +34,23 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SEED_CSV = resolve(HERE, 'seed-artists.csv');
-const SCHEMA_PATH = resolve(HERE, 'schema.sql');
-// 수집한 곡 목록과 받은 오디오 값 기록은 크고 외부 API 응답에서 나온 자료라서, git에 올라가지 않는 .local 폴더에 둡니다.
+// 수집한 곡 목록과 오디오 값은 git에 올리지 않도록 .local에 둡니다.
 const LOCAL_DIR = resolve(HERE, '../../.local/v3');
 const DEFAULT_TRACKS_FILE = resolve(LOCAL_DIR, 'collected-tracks.json');
 const DEFAULT_FEATURES_FILE = resolve(LOCAL_DIR, 'audio-features.jsonl');
 const API_BASE_URL = process.env.RECCOBEATS_API_BASE_URL ?? 'https://api.reccobeats.com/v1';
 const TABLE = 'tracks_v3';
 
-const TRACK_BATCH_SIZE = 40; // GET /track?ids=, GET /audio-features?ids=로 한 번에 조회할 수 있는 곡 수
+const TRACK_BATCH_SIZE = 40; // ids 쿼리로 한 번에 조회할 수 있는 최대 개수
 const ARTIST_PAGE_SIZE = 50;
 const CONCURRENCY = 3;
-const MIN_INTERVAL_MS = 120; // 요청 사이의 최소 간격입니다. (초당 약 8회)
+const MIN_INTERVAL_MS = 120; // 요청 사이의 최소 간격(초당 약 8회)
 const MAX_ATTEMPTS = 5;
 const INSERT_BATCH_SIZE = 500;
 
 const SPOTIFY_ID_PATTERN = /^[0-9A-Za-z]{22}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// ReccoBeats /audio-features 응답의 항목입니다. 변환 없이 응답 값 그대로 저장합니다.
+// /audio-features 응답에서 저장하는 항목
 const FEATURE_FIELDS = ['acousticness', 'danceability', 'energy', 'instrumentalness', 'key', 'liveness', 'loudness', 'mode', 'speechiness', 'tempo', 'valence'];
 const FEATURE_COLUMNS = ['acousticness', 'danceability', 'energy', 'instrumentalness', 'liveness', 'loudness', 'speechiness', 'tempo', 'valence', 'musical_key', 'musical_mode'];
 const INSERT_COLUMNS = [
@@ -77,7 +70,7 @@ function sleep(ms) {
     return new Promise(done => setTimeout(done, ms));
 }
 
-// 터미널이면 한 줄을 계속 덮어써서 진행 상황을 보여주고, 파일로 저장하는 등 터미널이 아니면 일정 간격마다 새 줄로 출력합니다.
+// 터미널이면 진행 줄을 덮어쓰고, 아니면 일정 간격마다 새 줄로 출력합니다.
 const isTty = Boolean(process.stdout.isTTY);
 let statusActive = false;
 
@@ -131,7 +124,7 @@ function parseArgs(argv) {
 
 // ---------- CSV (시드 읽기용) ----------
 
-/** 따옴표와 줄바꿈을 처리하는 최소한의 CSV 파서입니다. 열 개수가 모자란 행도 그대로 돌려줍니다. */
+/** 따옴표와 줄바꿈을 처리하는 최소 CSV 파서입니다. 열이 모자란 행도 그대로 반환합니다. */
 function parseCsv(text) {
     const rows = [];
     let row = [];
@@ -162,11 +155,11 @@ function parseCsv(text) {
 
 let lastRequestAt = 0;
 let pacing = Promise.resolve();
-let blockedUntil = 0; // 한도 초과(429)를 받으면 이 시각까지 모든 요청이 함께 쉽니다.
+let blockedUntil = 0; // 한도 초과(429)를 받으면 이 시각까지 모든 요청이 대기합니다.
 let rateLimitHits = 0;
-let rateLimitQuiet = false; // 진행 상황 줄을 그리는 동안에는 한도 초과 안내 줄을 따로 출력하지 않습니다.
+let rateLimitQuiet = false; // 진행 줄을 그리는 동안에는 한도 초과 안내를 출력하지 않습니다.
 
-/** 모든 요청이 순서대로 최소 간격을 두고 나가게 합니다. */
+/** 요청을 최소 간격을 두고 순서대로 내보냅니다. */
 function paceRequests() {
     const turn = pacing.then(async () => {
         const wait = Math.max(MIN_INTERVAL_MS - (Date.now() - lastRequestAt), blockedUntil - Date.now());
@@ -179,7 +172,7 @@ function paceRequests() {
 
 let requestCount = 0;
 
-/** JSON을 가져옵니다. 400/404는 null이고, 429와 일시적인 오류는 다시 시도합니다. */
+/** JSON을 반환합니다. 400/404는 null이며, 429와 일시적 오류는 재시도합니다. */
 async function getJson(path, params) {
     const query = new URLSearchParams(params).toString().replaceAll('%2C', ',');
     const url = `${API_BASE_URL}${path}?${query}`;
@@ -201,7 +194,7 @@ async function getJson(path, params) {
             blockedUntil = Math.max(blockedUntil, Date.now() + waitSec * 1000);
             rateLimitHits++;
             if (!rateLimitQuiet) console.log(`  (요청이 너무 많다는 응답을 받아 ${waitSec}초 쉬었다가 이어갑니다.)`);
-            attempt--; // 한도 초과는 재시도 횟수에 넣지 않습니다.
+            attempt--; // 한도 초과는 재시도 횟수에 포함하지 않습니다.
             continue;
         }
         if (response.status === 400 || response.status === 404) return null;
@@ -217,7 +210,7 @@ async function getJson(path, params) {
 
 const spotifyIdFromHref = href => (href ?? '').replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop() || null;
 
-/** 값에서 Spotify 아티스트 ID(22자)를 꺼냅니다. ID, spotify:artist:ID, 아티스트 페이지 링크를 모두 받아요. */
+/** ID, spotify:artist:ID, 아티스트 페이지 링크에서 Spotify 아티스트 ID(22자)를 추출합니다. */
 function extractSpotifyArtistId(value) {
     const match = value.trim().match(/^(?:spotify:artist:|https?:\/\/open\.spotify\.com\/(?:intl-[a-z]+\/)?artist\/)?([0-9A-Za-z]{22})(?:[?/#].*)?$/);
     return match ? match[1] : null;
@@ -226,11 +219,9 @@ function extractSpotifyArtistId(value) {
 // ---------- 곡 선택 ----------
 
 /**
- * 한 아티스트의 곡 목록에서 올릴 곡을 고릅니다.
- * Spotify ID를 읽을 수 없는 곡만 빼고, 인기도가 높은 순으로 정렬합니다.
- * 이 아티스트가 첫 번째가 아닌 곡("A & 이 아티스트")도 넣습니다. 같은 곡이 다른 아티스트의 목록에도 있으면 spotify_id가 같아서 하나만 올라갑니다.
- * 같은 곡처럼 보이는 것을 합치거나 연주곡·MR을 가르지는 않습니다. 제목 비교로는 다른 곡이 합쳐지거나 같은 곡이 남을 수 있어서,
- * 그런 거름은 조회할 때 합니다.
+ * 아티스트의 곡에서 Spotify ID, ReccoBeats ID, 제목을 읽을 수 없는 곡을 제외하고 인기도 내림차순으로 정렬합니다.
+ * 제목으로 같은 곡을 합치거나 연주곡을 가르지 않으며, 그런 선별은 조회할 때 합니다.
+ * 여러 아티스트의 목록에 있는 곡은 spotify_id가 같으므로 한 번만 적재됩니다.
  */
 function selectForArtist(tracks, options) {
     const stats = { total: tracks.length, noSpotifyId: 0 };
@@ -258,7 +249,7 @@ function selectForArtist(tracks, options) {
 async function fetchArtistTracks(artistId) {
     const tracks = [];
     let totalElements = 0;
-    // 마지막 페이지까지 모두 가져옵니다. (내용이 빈 페이지가 나오면 거기서 멈춥니다.)
+    // 마지막 페이지나 빈 페이지를 만날 때까지 가져옵니다.
     for (let page = 0; ; page++) {
         const data = await getJson(`/artist/${artistId}/track`, { size: ARTIST_PAGE_SIZE, page });
         if (!data || (data.content ?? []).length === 0) break;
@@ -269,7 +260,7 @@ async function fetchArtistTracks(artistId) {
     return { tracks, totalElements };
 }
 
-/** 오디오 값 기록 파일에서 이미 받은 값을 읽습니다. 값이 없다고 확인된 곡은 null로 들어갑니다. 마지막 줄이 중간에 끊겨 있으면 그 줄은 무시합니다. */
+/** 기록 파일을 읽습니다. 값이 없다고 확인된 곡은 null이며, 중단되어 일부만 기록된 마지막 줄은 무시합니다. */
 function readSavedFeatures(path) {
     const features = new Map();
     if (!existsSync(path)) return features;
@@ -279,16 +270,13 @@ function readSavedFeatures(path) {
             const item = JSON.parse(line);
             if (item.id) features.set(item.id, item.none ? null : item);
         } catch {
-            // 실행이 갑자기 끊겨 마지막 줄이 일부만 기록된 경우입니다.
+            // 일부만 기록된 마지막 줄
         }
     }
     return features;
 }
 
-/**
- * 곡들의 오디오 값을 40곡씩 병렬로 받아 { Spotify ID → 응답 항목 | null } 지도로 돌려줍니다.
- * 받은 묶음은 곧바로 기록 파일에 곡마다 한 줄씩 덧붙이므로, 실행이 멈춰도 다음 실행에서 이어서 받습니다.
- */
+/** 오디오 값을 받아 { Spotify ID → 응답 항목 | null } 지도로 반환합니다. 받은 즉시 기록 파일에 덧붙여 중단 후 이어받을 수 있습니다. */
 async function fetchFeatures(spotifyIds, featuresFile) {
     const features = readSavedFeatures(featuresFile);
     const todo = spotifyIds.filter(id => !features.has(id));
@@ -301,7 +289,7 @@ async function fetchFeatures(spotifyIds, featuresFile) {
 
     const startedAt = Date.now();
     const requestsAtStart = requestCount;
-    const samples = [[startedAt, 0]]; // 최근 1분 동안의 속도로 남은 시간을 계산합니다.
+    const samples = [[startedAt, 0]]; // 최근 1분의 처리량으로 남은 시간을 추정합니다.
     let done = 0;
     let lastPrinted = 0;
     const report = force => {
@@ -332,7 +320,7 @@ async function fetchFeatures(spotifyIds, featuresFile) {
             };
             const data = await getJson('/audio-features', { ids: batch.join(',') });
             if (data) collect(data);
-            else for (const id of batch) collect(await getJson('/audio-features', { ids: id })); // 묶음 요청이 실패하면 하나씩 다시 시도합니다.
+            else for (const id of batch) collect(await getJson('/audio-features', { ids: id })); // 묶음 요청이 실패하면 개별로 재요청합니다.
 
             const lines = [];
             for (const id of batch) {
@@ -358,7 +346,7 @@ async function fetchFeatures(spotifyIds, featuresFile) {
     return features;
 }
 
-/** 시드 CSV에서 (장르, 아티스트, 아티스트 Spotify ID)를 읽습니다. ID가 비어 있는 행은 건너뜁니다. */
+/** 시드 CSV에서 (장르, 아티스트, 아티스트 Spotify ID)를 읽습니다. ID가 빈 행은 건너뜁니다. */
 function readSeeds(path, genreFilter) {
     if (!existsSync(path)) fail(`시드 CSV가 없습니다: ${path}`);
     const rows = parseCsv(readFileSync(path, 'utf8'));
@@ -387,7 +375,7 @@ async function runPool(items, worker) {
 
 // ---------- DB ----------
 
-/** 접속 주소에서 호스트, 포트, DB 이름만 꺼내 보여줍니다. 사용자 이름과 비밀번호는 절대 출력하지 않습니다. */
+/** 접속 주소에서 호스트, 포트, DB 이름만 추출합니다. 자격 증명은 출력하지 않습니다. */
 function describeTarget(databaseUrl) {
     let url;
     try {
@@ -409,7 +397,7 @@ async function connect() {
     return client;
 }
 
-/** 이미 DB에 있는 곡의 ID를 읽습니다. 테이블이 아직 없으면 비어 있는 것으로 봅니다. 요약에서 새 곡과 기존 곡을 나눠 세는 데만 씁니다. */
+/** 이미 적재된 곡의 ID를 읽습니다. 테이블이 없으면 비어 있는 것으로 봅니다. 요약의 신규·기존 집계에만 쓰입니다. */
 async function readExisting(client) {
     const exists = (await client.query(`SELECT to_regclass('public.${TABLE}') AS name`)).rows[0].name;
     if (!exists) return { tableExists: false, spotifyIds: new Set() };
@@ -417,14 +405,10 @@ async function readExisting(client) {
     return { tableExists: true, spotifyIds: new Set(rows.map(row => row.spotify_id)) };
 }
 
-/**
- * 한 번의 트랜잭션으로 올립니다. 같은 곡(spotify_id)이 이미 있으면 새 행을 만들지 않고, artist_reccobeats_ids와 오디오 값 열만 맞춥니다.
- * (같은 곡이면 이 값들은 항상 같아서, 이전에 올라간 행에 새로 생긴 열을 채우는 데도 이 경로를 씁니다.)
- */
+/** 하나의 트랜잭션으로 적재합니다. 이미 있는 곡은 artist_reccobeats_ids와 오디오 값만 갱신합니다. */
 async function insertRows(client, rows) {
     await client.query('BEGIN');
     try {
-        await client.query(readFileSync(SCHEMA_PATH, 'utf8'));
         const updateColumns = ['artist_reccobeats_ids', ...FEATURE_COLUMNS];
         const onConflict = `ON CONFLICT (spotify_id) DO UPDATE SET ${updateColumns.map(column => `${column} = EXCLUDED.${column}`).join(', ')} RETURNING (xmax = 0) AS inserted`;
         let inserted = 0;
@@ -451,7 +435,7 @@ async function insertRows(client, rows) {
     }
 }
 
-/** DB에 올리기 전에 한 번 더 검사합니다. 스키마의 제약을 어길 행은 미리 걸러서 트랜잭션이 통째로 실패하지 않게 해요. */
+/** 스키마 제약을 어기는 행을 적재 전에 걸러, 트랜잭션 전체가 실패하지 않게 합니다. */
 function rowIssue(row) {
     if (!SPOTIFY_ID_PATTERN.test(row.spotify_id)) return 'Spotify ID 형식이 올바르지 않습니다.';
     if (!UUID_PATTERN.test(row.reccobeats_id) || row.artist_reccobeats_ids.length === 0 || !row.artist_reccobeats_ids.every(id => UUID_PATTERN.test(id ?? ''))) return 'ReccoBeats ID 형식이 올바르지 않습니다.';
@@ -464,7 +448,7 @@ function rowIssue(row) {
 
 // ---------- 수집과 적재 ----------
 
-/** 수집 결과 파일(JSON 배열)을 { Spotify ID → 곡 } 지도로 읽습니다. */
+/** 곡 목록 파일을 { Spotify ID → 곡 } 지도로 읽습니다. */
 function readCollectedTracks(path) {
     let tracks;
     try {
@@ -494,7 +478,7 @@ async function load(options) {
         if (seeds.length === 0) fail('아티스트 ID가 채워진 시드가 없어서 중단합니다.');
     }
 
-    // 이미 있는 곡을 읽는 데만 잠깐 접속하고 끊습니다. 수집에 오래 걸려도 연결이 놀다가 끊기지 않도록, 적재할 때 다시 접속합니다.
+    // 기존 곡을 읽을 때만 접속하고 끊습니다. 수집이 길어져도 연결이 끊기지 않도록 적재할 때 다시 접속합니다.
     let existing = { tableExists: false, spotifyIds: new Set() };
     if (process.env.DATABASE_URL) {
         const client = await connect();
@@ -503,7 +487,8 @@ async function load(options) {
         } finally {
             await client.end().catch(() => {});
         }
-        console.log(`${TABLE} 현재: ${existing.tableExists ? `${existing.spotifyIds.size.toLocaleString('ko-KR')}곡` : '테이블이 아직 없습니다'}`);
+        console.log(`${TABLE} 현재: ${existing.tableExists ? `${existing.spotifyIds.size.toLocaleString('ko-KR')}곡` : '테이블이 아직 없습니다. src/db/schema.sql을 먼저 실행해 주십시오.'}`);
+        if (options.yes && !existing.tableExists) fail(`${TABLE} 테이블이 없어서 중단합니다. src/db/schema.sql을 먼저 실행해 주십시오.`);
     } else {
         if (options.yes) fail('--yes로 DB에 올리려면 DATABASE_URL이 필요합니다.\n.env 파일에 적고 --env-file=.env 옵션으로 실행해 주십시오.');
         console.log('DATABASE_URL이 없어 DB 없이 미리보기만 합니다. (이미 있는 곡은 확인하지 못합니다.)');
@@ -514,9 +499,9 @@ async function load(options) {
     await collectAndInsert(options, seeds, existing, hasCollected);
 }
 
-/** 시드의 아티스트들을 ReccoBeats에서 찾고, 아티스트마다 곡 전체를 받아 { Spotify ID → 곡 } 지도와 아티스트별 결과를 돌려줍니다. */
+/** 시드 아티스트를 ReccoBeats에서 찾고 아티스트별 곡 전체를 수집합니다. */
 async function collectTracks(options, seeds) {
-    // 1) 시드의 Spotify 아티스트 ID로 ReccoBeats 아티스트를 찾습니다. 이 단계가 끝나면 못 찾은 시드를 먼저 알려 줍니다.
+    // 1) 시드를 ReccoBeats 아티스트로 변환합니다.
     const found = new Map(); // Spotify 아티스트 ID → { id, name }
     const collectArtists = data => {
         for (const artist of data?.content ?? []) {
@@ -529,7 +514,7 @@ async function collectTracks(options, seeds) {
         const batch = spotifyIds.slice(i, i + TRACK_BATCH_SIZE);
         const data = await getJson('/artist', { ids: batch.join(',') });
         if (data) collectArtists(data);
-        else for (const id of batch) collectArtists(await getJson('/artist', { ids: id })); // 묶음 요청이 실패하면 하나씩 다시 시도합니다.
+        else for (const id of batch) collectArtists(await getJson('/artist', { ids: id })); // 묶음 요청이 실패하면 개별로 재요청합니다.
     }
     const artists = new Map(); // ReccoBeats 아티스트 ID → { id, name, seedNames, genres }
     const unresolved = [];
@@ -544,17 +529,17 @@ async function collectTracks(options, seeds) {
         artists.get(artist.id).genres.add(seed.genre);
     }
 
-    // 아티스트를 하나라도 찾지 못했으면 수집을 시작하지 않습니다. CSV의 아티스트 ID를 고치거나 그 행을 비운 뒤 다시 실행해 주십시오.
+    // 하나라도 찾지 못하면 수집하지 않습니다.
     if (unresolved.length > 0) {
         console.log(`⚠ ReccoBeats에서 찾지 못한 시드 아티스트 ${unresolved.length}개:`);
         unresolved.forEach(seed => console.log(`  - ${seed.line}행 ${seed.artist} (${seed.spotifyId})`));
         throw new Error('시드 아티스트를 모두 찾은 뒤에 수집할 수 있어서 중단합니다. (아무것도 수집하거나 변경하지 않았습니다.)');
     }
 
-    // 2) 이미 DB에 있는 아티스트인지는 따지지 않고 모두 수집합니다.
+    // 2) 적재 여부와 관계없이 모든 아티스트를 수집합니다.
     const list = [...artists.values()];
 
-    // 3) 아티스트마다 곡 전체를 받아 후보를 고릅니다.
+    // 3) 아티스트별로 곡 전체를 받아 후보를 고릅니다.
     const results = new Map();
     let done = 0;
     await runPool(list, async artist => {
@@ -564,7 +549,7 @@ async function collectTracks(options, seeds) {
         if (done % 10 === 0 || done === list.length) console.log(`  아티스트 ${done}/${list.length} 처리 (요청 ${requestCount}회)`);
     });
 
-    // 다른 아티스트의 목록에도 있는 곡은 Spotify ID가 같아서 한 번만 담습니다.
+    // 여러 아티스트에 걸친 곡은 spotify_id 기준으로 한 번만 담습니다.
     const tracks = new Map();
     for (const artist of list) {
         for (const t of results.get(artist.id).selected) {
@@ -574,7 +559,7 @@ async function collectTracks(options, seeds) {
     return { tracks, artists, list, results };
 }
 
-/** 곡과 오디오 값 응답 항목으로 DB에 올릴 한 행을 만듭니다. 범위를 벗어난 나머지 값은 NULL로 둡니다. */
+/** 곡과 오디오 값으로 적재할 행을 만듭니다. 범위를 벗어난 보조 값은 NULL로 둡니다. */
 function buildRow(t, f) {
     const unit = x => (Number.isFinite(x) && x >= 0 && x <= 1 ? x : null);
     return {
@@ -607,7 +592,6 @@ async function collectAndInsert(options, seeds, existing, hasCollected) {
         console.log(`수집한 곡 ${tracks.size.toLocaleString('ko-KR')}곡을 ${options.tracksFile}에 저장했습니다. (다음 실행에서는 이 목록으로 이어서 진행합니다.)\n`);
     }
 
-    // 선택된 곡의 오디오 값을 받습니다.
     mkdirSync(dirname(options.featuresFile), { recursive: true });
     const features = await fetchFeatures([...tracks.keys()], options.featuresFile);
     const noFeatures = [];
