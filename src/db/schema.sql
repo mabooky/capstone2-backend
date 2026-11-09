@@ -30,3 +30,11 @@ CREATE TABLE IF NOT EXISTS tracks_v3 (
 );
 
 CREATE INDEX IF NOT EXISTS tracks_v3_artists_idx ON tracks_v3 USING gin (artist_reccobeats_ids);
+
+-- 매장. id는 서버가 무작위로 생성하며 고객에게 노출되는 매장 주소에 쓰입니다.
+CREATE TABLE IF NOT EXISTS stores (
+    id text PRIMARY KEY CHECK (char_length(id) = 8),
+    name text NOT NULL CHECK (btrim(name) <> '' AND char_length(name) <= 50),
+    admin_password_hash text NOT NULL, -- scrypt$N$r$p$salt$hash
+    created_at timestamptz NOT NULL DEFAULT now()
+);
