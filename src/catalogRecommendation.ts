@@ -90,21 +90,17 @@ function shuffle<T>(values: T[], random: () => number): T[] {
     return values;
 }
 
-/** No DB or research data access. Uniform sampling without replacement, followed by a uniform result shuffle. */
+/** Input is the library's prevalidated, ID-unique recommendation snapshot. No DB access.
+ * Uniform sampling without replacement, followed by a uniform result shuffle. */
 export function recommendCatalog(library: readonly Track[], input: CatalogRequest, random: () => number = Math.random): CatalogResult {
     const request = parseCatalogRequest(input);
-    // tracks_v3 has a primary key; synthetic duplicate rows retain the first valid row per ID.
-    const byId = new Map<string, Track>();
-    for (const track of library) {
-        if (hasValidCoordinates(track) && !byId.has(track.spotifyId)) byId.set(track.spotifyId, track);
-    }
     const seeds: Track[] = request.mode === 'seeds' ? request.spotifyIds.map(id => {
-        const track = byId.get(id);
-        if (!track) throw new ApiError(400, 'INVALID_INPUT', '기준곡이 없거나 유효한 감정 좌표가 없습니다.');
+        const track = library.find(track => track.spotifyId === id);
+        if (!track || !hasValidCoordinates(track)) throw new ApiError(400, 'INVALID_INPUT', '기준곡이 없거나 유효한 감정 좌표가 없습니다.');
         return track;
     }) : [];
     const polygon = hull(seeds);
-    const candidates = [...byId.values()].filter(p => request.mode === 'range'
+    const candidates = library.filter(p => request.mode === 'range'
         ? p.valence >= request.valenceMin - EPS && p.valence <= request.valenceMax + EPS &&
           p.arousal >= request.energyMin - EPS && p.arousal <= request.energyMax + EPS
         : inBufferedHull(p, polygon));

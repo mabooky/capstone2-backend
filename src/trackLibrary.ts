@@ -38,6 +38,13 @@ export function createTrackLibrary(rows: readonly TrackRow[]): TrackLibrary {
             arousal: normalize(row.energy),
         }));
     const byId = new Map(tracks.map(track => [track.spotifyId, track]));
+    // 추천은 ID별 첫 유효 행을 사용합니다. 전체 곡 조회용 byId의 마지막 행 정책과 구분합니다.
+    const recommendationIds = new Set<string>();
+    const recommendationTracks = tracks.filter(track => {
+        if (!hasValidCoordinates(track) || recommendationIds.has(track.spotifyId)) return false;
+        recommendationIds.add(track.spotifyId);
+        return true;
+    });
     const valences = Float64Array.from(tracks, track => track.valence);
     const arousals = Float64Array.from(tracks, track => track.arousal);
     const searchTexts = tracks.map(track => `${track.title}\n${track.artist}`.toLowerCase());
@@ -46,7 +53,7 @@ export function createTrackLibrary(rows: readonly TrackRow[]): TrackLibrary {
         size: tracks.length,
 
         recommend(input: CatalogRequest, random?: () => number): CatalogResult {
-            return recommendCatalog(tracks, input, random);
+            return recommendCatalog(recommendationTracks, input, random);
         },
 
         get(spotifyId: string): Track | undefined {
