@@ -1,4 +1,5 @@
 import express from 'express';
+import { insertTrackRequest } from '../db/trackRequestRepository.js';
 import { optionalUser, requireUser } from '../middleware.js';
 import { adminRouter } from './adminRouter.js';
 import { bodyString, queryNumber, queryString } from './input.js';
@@ -29,8 +30,18 @@ storeRouter.get('/state', optionalUser, (req, res) => {
     res.json(res.locals.store.getState(res.locals.user?.id));
 });
 
-storeRouter.post('/queue', requireUser, (req, res) => {
-    const entry = res.locals.store.enqueue(res.locals.user!.id, bodyString(req.body, 'spotifyId'));
+storeRouter.post('/queue', requireUser, async (req, res) => {
+    const store = res.locals.store;
+    const userId = res.locals.user!.id;
+    const spotifyId = bodyString(req.body, 'spotifyId');
+
+    const entry = store.enqueue(userId, spotifyId);
+    // 이력은 부가 정보이므로 저장에 실패해도 이미 접수된 신청은 성공으로 응답합니다.
+    try {
+        await insertTrackRequest(userId, store.id, spotifyId);
+    } catch (error) {
+        console.error('곡 신청 이력을 저장하지 못했습니다.', error);
+    }
     res.status(201).json(entry);
 });
 
