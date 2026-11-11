@@ -1,7 +1,8 @@
-import type { ErrorRequestHandler, RequestHandler } from 'express';
+import type { ErrorRequestHandler, Request, RequestHandler } from 'express';
 import { ApiError } from './errors.js';
 import type { Store } from './store.js';
 import { findUserBySessionHash } from './db/sessionRepository.js';
+import type { UserRow } from './db/userRepository.js';
 import { hashSessionToken } from './auth/sessionToken.js';
 
 /** 요청 처리 중 발생한 오류를 명세의 에러 응답 형식으로 바꿉니다. 모든 라우터 뒤에 등록해야 합니다. */
@@ -66,19 +67,40 @@ export const requireAdmin: RequestHandler = (req, res, next) => {
     next();
 };
 
+/** Authorization: Bearer 토큰으로 로그인한 사용자를 찾습니다. 토큰이 없거나 세션이 없거나 만료되었으면 null입니다. */
+async function findSessionUser(req: Request): Promise<{ user: UserRow; sessionHash: Buffer } | null> {
+    const token = /^Bearer (.+)$/i.exec(req.get('Authorization') ?? '')?.[1];
+    if (token === undefined) return null;
+
+    const sessionHash = hashSessionToken(token);
+    const user = await findUserBySessionHash(sessionHash);
+    return user && { user, sessionHash };
+}
+
 /**
- * Authorization: Bearer 토큰으로 로그인한 사용자를 확인해 res.locals.user와 res.locals.sessionHash에 담습니다.
- * 토큰이 없거나 세션이 없거나 만료되었으면 401 CUSTOMER_UNAUTHORIZED를 반환합니다.
+ * 로그인한 사용자를 확인해 res.locals.user와 res.locals.sessionHash에 담습니다.
+ * 로그인하지 않았거나 세션이 만료되었으면 401 CUSTOMER_UNAUTHORIZED를 반환합니다.
  */
 export const requireUser: RequestHandler = async (req, res, next) => {
-    const token = /^Bearer (.+)$/i.exec(req.get('Authorization') ?? '')?.[1];
-    const sessionHash = token === undefined ? undefined : hashSessionToken(token);
-    const user = sessionHash && await findUserBySessionHash(sessionHash);
-    if (!user) {
+    const session = await findSessionUser(req);
+    if (session === null) {
         throw new ApiError(401, 'CUSTOMER_UNAUTHORIZED', '로그인이 필요합니다.');
     }
 
-    res.locals.user = user;
-    res.locals.sessionHash = sessionHash;
+    res.locals.user = session.user;
+    res.locals.sessionHash = session.sessionHash;
+    next();
+};
+
+/**
+ * 로그인한 사용자가 있으면 requireUser처럼 res.locals에 담고, 없거나 세션이 만료되었으면 오류 없이 넘어갑니다.
+ * 로그인하지 않아도 쓸 수 있지만 로그인 여부에 따라 응답이 달라지는 엔드포인트에 사용합니다.
+ */
+export const optionalUser: RequestHandler = async (req, res, next) => {
+    const session = await findSessionUser(req);
+    if (session !== null) {
+        res.locals.user = session.user;
+        res.locals.sessionHash = session.sessionHash;
+    }
     next();
 };
