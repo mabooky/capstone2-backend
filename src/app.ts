@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createTrackLibrary, type TrackLibrary } from './trackLibrary.js';
 import { errorHandler, resolveStore } from './middleware.js';
 import { authRouter } from './routes/authRouter.js';
+import { createMeRouter } from './routes/meRouter.js';
 import { storeRouter } from './routes/storeRouter.js';
 import { findAllStores } from './db/storeRepository.js';
 import { findAllTracks } from './db/trackRepository.js';
@@ -46,6 +47,7 @@ export async function createApp() {
     });
 
     app.use('/api/auth', authRouter);
+    app.use('/api/me', createMeRouter(globalTrackLibrary));
     app.use('/api/stores/:storeId', resolveStore(stores), storeRouter);
 
     app.use(errorHandler);
