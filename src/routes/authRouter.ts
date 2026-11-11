@@ -21,6 +21,6 @@ authRouter.post('/kakao/login', async (req, res) => {
 });
 
 authRouter.post('/logout', requireUser, async (req, res) => {
-    await deleteSession(res.locals.sessionHash);
+    await deleteSession(res.locals.sessionHash!);
     res.status(204).end();
 });

@@ -1,6 +1,5 @@
 export type ErrorCode =
     | 'INVALID_INPUT'
-    | 'MISSING_CLIENT_ID'
     | 'UNAUTHORIZED'
     | 'CUSTOMER_UNAUTHORIZED'
     | 'INVALID_CREDENTIALS'

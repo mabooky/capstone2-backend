@@ -48,16 +48,6 @@ export function resolveStore(stores: readonly Store[]): RequestHandler {
     };
 }
 
-/** X-Client-Id 헤더를 읽어 res.locals.clientId에 담습니다. 헤더가 없으면 400 MISSING_CLIENT_ID를 반환합니다. */
-export const requireClientId: RequestHandler = (req, res, next) => {
-    const clientId = req.get('X-Client-Id')?.trim();
-    if (!clientId) {
-        throw new ApiError(400, 'MISSING_CLIENT_ID', '요청 헤더에 X-Client-Id가 필요합니다.');
-    }
-    res.locals.clientId = clientId;
-    next();
-};
-
 /** Authorization: Bearer 토큰이 매장의 현재 관리자 토큰인지 확인합니다. 아니면 401 UNAUTHORIZED를 반환합니다. resolveStore 뒤에 등록해야 합니다. */
 export const requireAdmin: RequestHandler = (req, res, next) => {
     const token = /^Bearer (.+)$/i.exec(req.get('Authorization') ?? '')?.[1];

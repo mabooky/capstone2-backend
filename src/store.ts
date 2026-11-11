@@ -14,8 +14,8 @@ export type Mood = { valence: number; arousal: number; n: number };
 
 type PlaySource = 'request' | 'fallback';
 
-/** 서버가 저장하는 대기열의 한 곡입니다. clientId는 서버 안에서만 쓰고 응답으로 내보내지 않습니다. */
-type QueueEntryServer = { queueId: string; track: Track; requestedAt: number; clientId: string };
+/** 서버가 저장하는 대기열의 한 곡입니다. userId는 서버 안에서만 쓰고 응답으로 내보내지 않습니다. */
+type QueueEntryServer = { queueId: string; track: Track; requestedAt: number; userId: string };
 
 /** 응답으로 나가는 대기열의 한 곡입니다. API 명세의 QueueEntry에 해당합니다. */
 export type QueueEntry = { queueId: string; track: Track; requestedAt: number; mine: boolean };
@@ -184,8 +184,8 @@ export class Store {
         return this.catalog.map(track => this.withStatus(track));
     }
 
-    /** GET /state: 재생 중인 곡과 대기열 전체입니다. clientId가 신청한 곡에는 mine이 true입니다. */
-    getState(clientId?: string): StoreState {
+    /** GET /state: 재생 중인 곡과 대기열 전체입니다. userId가 신청한 곡에는 mine이 true입니다. */
+    getState(userId?: string): StoreState {
         return {
             serverTime: this.now(),
             catalogHash: this.catalogHash,
@@ -198,7 +198,7 @@ export class Store {
                 queueId: entry.queueId,
                 track: entry.track,
                 requestedAt: entry.requestedAt,
-                mine: clientId !== undefined && entry.clientId === clientId,
+                mine: userId !== undefined && entry.userId === userId,
             })),
         };
     }
@@ -218,14 +218,15 @@ export class Store {
         return { total, tracks: tracks.map(track => this.withStatus(track)) };
     }
 
-    /** 이 고객이 신청한 곡이 대기열에 있는지 확인합니다. 재생 중인 곡은 대기 중으로 보지 않습니다. */
-    private hasPendingRequest(clientId: string): boolean {
-        return this.queue.some(entry => entry.clientId === clientId);
+    /** 이 사용자가 신청한 곡이 대기열에 있는지 확인합니다. 재생 중인 곡은 대기 중으로 보지 않습니다. */
+    private hasPendingRequest(userId: string): boolean {
+        return this.queue.some(entry => entry.userId === userId);
     }
 
-    /** GET /me: 이 고객이 지금 곡을 신청할 수 있는지 알려줍니다. */
-    getMe(clientId: string): { canRequest: boolean; reason: 'MY_REQUEST_PENDING' | null } {
-        return this.hasPendingRequest(clientId)
+    /** GET /me: 이 사용자가 지금 곡을 신청할 수 있는지 알려줍니다. 로그인하지 않았으면 userId가 없습니다. */
+    getMe(userId?: string): { canRequest: boolean; reason: 'LOGIN_REQUIRED' | 'MY_REQUEST_PENDING' | null } {
+        if (userId === undefined) return { canRequest: false, reason: 'LOGIN_REQUIRED' };
+        return this.hasPendingRequest(userId)
             ? { canRequest: false, reason: 'MY_REQUEST_PENDING' }
             : { canRequest: true, reason: null };
     }
@@ -235,7 +236,7 @@ export class Store {
      * 명세의 순서대로 검사하고, 모두 통과했을 때만 마지막에 대기열을 바꿉니다.
      * 검사와 변경 사이에 await가 없으므로 다른 요청이 끼어들 수 없습니다.
      */
-    enqueue(clientId: string, spotifyId: string): QueueEntry {
+    enqueue(userId: string, spotifyId: string): QueueEntry {
         // ---- 검사 ----
         const track = this.trackLibrary.get(spotifyId);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
@@ -251,7 +252,7 @@ export class Store {
             const retryAfterSec = Math.max(1, Math.ceil((availableAt - this.now()) / 1000));
             throw new ApiError(429, 'TRACK_COOLDOWN', '최근에 재생된 곡입니다.', retryAfterSec);
         }
-        if (this.hasPendingRequest(clientId)) {
+        if (this.hasPendingRequest(userId)) {
             throw new ApiError(409, 'MY_REQUEST_PENDING', '이미 대기열에 신청한 곡이 있습니다.');
         }
 
@@ -260,7 +261,7 @@ export class Store {
             queueId: `q${this.nextQueueNumber++}`,
             track,
             requestedAt: this.now(),
-            clientId,
+            userId,
         };
         this.queue.push(entry);
         return {
