@@ -62,3 +62,14 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at timestamptz NOT NULL DEFAULT now(),
     expires_at timestamptz NOT NULL
 );
+
+-- 곡 신청 이력. 신청이 접수될 때마다 한 행을 남깁니다. 곡의 제목과 아티스트는 저장하지 않습니다.
+CREATE TABLE IF NOT EXISTS track_requests (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    store_id text NOT NULL REFERENCES stores (id),
+    spotify_id text NOT NULL CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
+    requested_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS track_requests_user_idx ON track_requests (user_id, requested_at DESC);
