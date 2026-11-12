@@ -39,7 +39,7 @@
 Spotify ID로 중복 제거 후 기준곡을 확보하고 나머지를 균등 무작위 비복원 추출한다.
 결과도 무작위 순서로 반환하며 부족분을 영역 밖 곡으로 채우지 않는다.
 후보 부족과 0곡을 구분하는 결과 상태를 제공한다. 미등록·좌표 무효 기준곡 요청은 거부한다.
-공식 서비스는 `src/catalogRecommendation.ts` → 메모리 곡 라이브러리 → Store → 기존 `/admin/mood`로 연결했다.
+공식 서비스는 `src/tracks/catalogRecommendation.ts` → 메모리 곡 라이브러리 → Store → 기존 `/admin/mood`로 연결했다.
 기존 단일 기준점 요청·초기 카탈로그는 임시 호환 기능으로 유지한다. 영역 요청만 결과 상태를 포함한 객체를 반환한다.
 영역 미리보기도 기존 GET 경로에서 mode 쿼리로 지원하며 공개 `/catalog`는 기존 배열 응답을 유지한다.
 세부 입력·출력과 GET `/mood`의 추가 `region` 필드는 [API 명세](docs/API_SPEC.md)를 따른다.
@@ -58,7 +58,7 @@ Spotify ID로 중복 제거 후 기준곡을 확보하고 나머지를 균등 �
 | 구역 | 현재 구현·책임 |
 |---|---|
 | `src/index.ts`, `src/app.ts` | dotenv 로딩, 시작 시 곡 라이브러리 초기화, Express 앱·매장 구성·라우팅 |
-| `src/trackLibrary.ts`, `src/db/trackRepository.ts`, `src/catalogRecommendation.ts` | `trackRepository`가 `tracks_v3`를 조회하고 `app.ts`가 시작 시 한 번 라이브러리를 만든다. A 영역 추천·곡 조회·검색 및 임시 단일 좌표 호환 제공 |
+| `src/tracks/trackLibrary.ts`, `src/db/trackRepository.ts`, `src/tracks/catalogRecommendation.ts` | `trackRepository`가 `tracks_v3`를 조회하고 `app.ts`가 시작 시 한 번 라이브러리를 만든다. A 영역 추천·곡 조회·검색 및 임시 단일 좌표 호환 제공 |
 | `src/store.ts` | 매장별 기준점·카탈로그·대기열·재생 상태·쿨타임·관리자 토큰. 현재 모두 메모리 상태 |
 | `src/routes/`, `src/middleware.ts`, `src/models/` | 매장·관리자 API, 입력·권한 검사, 서비스 Track 타입 |
 | `src/music/algorithm/`, `integration/`, `db/001~003` | 기존 5모델 추천, 실험 파일 어댑터, 주입형 SQL 저장소·서비스, 연구 계열 스키마·VIEW |
@@ -72,7 +72,7 @@ PGlite는 합성 메모리 SQL 검증용 개발 의존성이다. Solapi는 의�
 인증 연동이 구현되거나 최종 인증 제공자가 확정되었다는 뜻은 아니다.
 
 현재 서비스 좌표는 `[-1,1]`이고, `tracks_v3`의 원본 Valence/Energy `[0,1]`를
-`trackLibrary.ts`에서 `2*x-1`로 변환한다. 기존 실험 DTO는 외부 `[0,1]`와 내부 `[-1,1]`를
+`src/tracks/trackLibrary.ts`에서 `2*x-1`로 변환한다. 기존 실험 DTO는 외부 `[0,1]`와 내부 `[-1,1]`를
 변환하므로 서로 섞지 않는다. A/B1/B2/C1/C2의 MuSe·ReccoBeats 정규화는
 [음악 SPEC](src/music/SPEC.md)의 해당 모듈 계약이다. 현재 매장 카탈로그가 이 5모델
 서비스를 호출하는 구조는 아니다. 제품 영역 카탈로그는 위 A 모델·좌표 원천을 사용하며 기존 실험 서비스는 호출하지 않는다.

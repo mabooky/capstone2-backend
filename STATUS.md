@@ -82,8 +82,8 @@ A 영역 추천·Store·기존 매장 HTTP 연동을 구현하고 합성 데이�
 
 ## 이번 영역 추천 구현과 검증
 
-- `src/catalogRecommendation.ts`: A 모델 좌표 기반 Hull·원형 버퍼·사각형·퇴화 영역·중복 제거·필수 기준곡·Fisher–Yates 추출/결과 셔플.
-- `src/trackLibrary.ts`: DB 조회(`src/db/trackRepository.ts`)와 분리된 메모리 라이브러리 구성으로, 합성 행으로 검증한다.
+- `src/tracks/catalogRecommendation.ts`: A 모델 좌표 기반 Hull·원형 버퍼·사각형·퇴화 영역·중복 제거·필수 기준곡·Fisher–Yates 추출/결과 셔플.
+- `src/tracks/trackLibrary.ts`: DB 조회(`src/db/trackRepository.ts`)와 분리된 메모리 라이브러리 구성으로, 합성 행으로 검증한다.
   SQL과 DB 연결 경로는 유지하며 null·빈 문자열 등 무효 좌표를 정상 좌표로 바꾸지 않는다.
 - Store에 영역 설정·미리보기 내부 호출을 연결했다. 갱신 전 검증·추출을 완료하므로 실패 시 상태를 보존한다.
   대기열·재생·쿨타임·인증 정책은 유지한다. 기존 PUT/GET 미리보기에서 mode로 영역 입력을 분기한다.

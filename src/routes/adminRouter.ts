@@ -3,7 +3,7 @@ import { verifyPassword } from '../auth/password.js';
 import { ApiError } from '../errors.js';
 import { requireAdmin } from '../middleware.js';
 import { bodyNumber, bodyString, queryNumber, regionQuery } from './input.js';
-import { parseCatalogRequest } from '../catalogRecommendation.js';
+import { parseCatalogRequest } from '../tracks/catalogRecommendation.js';
 
 export const adminRouter = express.Router();
 

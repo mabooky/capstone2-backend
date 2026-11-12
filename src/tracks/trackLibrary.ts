@@ -1,5 +1,5 @@
-import type { Track } from './models/track.js';
-import type { TrackRow } from './db/trackRepository.js';
+import type { Track } from './track.js';
+import type { TrackRow } from '../db/trackRepository.js';
 import { hasValidCoordinates, recommendCatalog, type CatalogRequest, type CatalogResult } from './catalogRecommendation.js';
 
 /** 전체 곡을 메모리에 올려 두고 조회하는 도구입니다. */

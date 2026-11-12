@@ -1,5 +1,5 @@
 import { ApiError } from '../errors.js';
-import { parseCatalogRequest, type CatalogRequest } from '../catalogRecommendation.js';
+import { parseCatalogRequest, type CatalogRequest } from '../tracks/catalogRecommendation.js';
 
 /** 요청 입력의 형식을 변환하고 확인하는 도구입니다. 값의 범위 같은 의미 검사는 Store가 합니다. */
 

@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { ApiError } from './errors.js';
 import { murmur3 } from './murmur3.js';
-import type { TrackLibrary } from './trackLibrary.js';
-import type { RequestStatus, Track, TrackWithStatus } from './models/track.js';
-import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './catalogRecommendation.js';
+import type { TrackLibrary } from './tracks/trackLibrary.js';
+import type { Track } from './tracks/track.js';
+import type { RequestStatus, TrackWithStatus } from './models/trackWithStatus.js';
+import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './tracks/catalogRecommendation.js';
 
 /** 기준점에서 n을 따로 지정하지 않았을 때의 곡 수입니다. */
 const DEFAULT_N = 100;

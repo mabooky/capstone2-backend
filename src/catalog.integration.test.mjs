@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { createTrackLibrary } from './trackLibrary.js';
+import { createTrackLibrary } from './tracks/trackLibrary.js';
 import { Store } from './store.js';
 import { hashPassword } from './auth/password.js';
 import { storeRouter } from './routes/storeRouter.js';

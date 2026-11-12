@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createTrackLibrary, type TrackLibrary } from './trackLibrary.js';
+import { createTrackLibrary, type TrackLibrary } from './tracks/trackLibrary.js';
 import { errorHandler, resolveStore } from './middleware.js';
 import { authRouter } from './routes/authRouter.js';
 import { createMeRouter } from './routes/meRouter.js';

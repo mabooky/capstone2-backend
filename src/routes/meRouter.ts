@@ -2,7 +2,7 @@ import express from 'express';
 import { countTrackRequestsByUser, findTrackRequestsByUser } from '../db/trackRequestRepository.js';
 import { ApiError } from '../errors.js';
 import { requireUser } from '../middleware.js';
-import type { TrackLibrary } from '../trackLibrary.js';
+import type { TrackLibrary } from '../tracks/trackLibrary.js';
 import { queryNumber } from './input.js';
 
 const DEFAULT_LIMIT = 20;

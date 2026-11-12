@@ -1,5 +1,5 @@
-import { ApiError } from './errors.js';
-import type { Track } from './models/track.js';
+import { ApiError } from '../errors.js';
+import type { Track } from './track.js';
 
 /** Product model A only. Track.arousal is normalized ReccoBeats Energy. */
 export type CatalogRequest =
