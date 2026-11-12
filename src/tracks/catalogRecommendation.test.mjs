@@ -17,7 +17,7 @@ test('convex hull includes interior, edges, circular buffer and rounded vertices
 });
 test('unsorted seeds form convex hull independent of seed order and retain interior seeds', () => {
     const library = [track(1, .5, .5), track(2, -.5, -.5), track(3, .5, -.5), track(4, -.5, .5), track(5, 0, 0)];
-    assert.equal(recommendCatalog(library, {mode:'seeds', spotifyIds:[id(1),id(2),id(5),id(4),id(3)], n:5}).returnedCount, 5);
+    assert.equal(recommendCatalog(library, {mode:'seeds', spotifyIds:[id(1),id(2),id(5),id(4),id(3)], n:5}).tracks.length, 5);
 });
 test('collinear seeds yield capsule including endpoint caps', () => {
     const library = [track(1, -.5, 0), track(2, 0, 0), track(3, .5, 0), track(4, .6, 0),
@@ -57,9 +57,9 @@ test('all seeds mandatory before sampling, full output shuffled, inputs untouche
     assert.deepEqual(library, snapshot);
 });
 test('empty and shortage are distinguishable, and seed count equal to n works', () => {
-    assert.deepEqual(recommendCatalog([], range(1)), {tracks:[],status:'empty',candidateCount:0,returnedCount:0});
+    assert.deepEqual(recommendCatalog([], range(1)), {tracks:[],status:'empty',candidateCount:0});
     assert.equal(recommendCatalog([track(1,0,0)], range(2)).status, 'insufficient-candidates');
-    assert.equal(recommendCatalog([track(1,0,0),track(2,0,0),track(3,0,0)], seeds(3)).returnedCount,3);
+    assert.equal(recommendCatalog([track(1,0,0),track(2,0,0),track(3,0,0)], seeds(3)).tracks.length,3);
 });
 test('request validation: size, finite bounds, reversed bounds, IDs, seeds, extra fields', () => {
     for (const n of [0,101,1.5,NaN,Infinity,'3',undefined]) assert.throws(() => parseCatalogRequest({...range(),n}), /n은/);

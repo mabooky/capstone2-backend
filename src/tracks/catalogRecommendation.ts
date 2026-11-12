@@ -9,7 +9,6 @@ export type CatalogResult = {
     tracks: Track[];
     status: 'complete' | 'insufficient-candidates' | 'empty';
     candidateCount: number;
-    returnedCount: number;
 };
 type Point = { valence: number; arousal: number };
 const BUFFER = 0.1;
@@ -107,6 +106,6 @@ export function recommendCatalog(library: readonly Track[], input: CatalogReques
     const seedIds = new Set(seeds.map(t => t.spotifyId));
     const others = shuffle(candidates.filter(t => !seedIds.has(t.spotifyId)), random).slice(0, request.n - seeds.length);
     const tracks = shuffle([...seeds, ...others], random);
-    return { tracks, candidateCount: candidates.length, returnedCount: tracks.length,
+    return { tracks, candidateCount: candidates.length,
         status: tracks.length === 0 ? 'empty' : tracks.length < request.n ? 'insufficient-candidates' : 'complete' };
 }

@@ -14,6 +14,7 @@ v0.9는 v0.8과 호환되지 않습니다. 주요 변경은 다음과 같습니�
 - **단일 기준점 API 제거:** `PUT /admin/mood`와 `GET /admin/mood/preview`는 영역 입력(`mode`)만 지원합니다. `mode`가 없는 요청은 `400 INVALID_INPUT`입니다. `Mood` 타입도 제거되었습니다.
 - **`GET /mood` 응답 변경:** 현재 영역 설정(`RegionRequest`)을 그대로 반환하며, 설정 전에는 `null`입니다.
 - **초기 카탈로그:** 서버를 시작한 직후에는 영역이 설정되어 있지 않아 카탈로그가 비어 있습니다. 점주가 `PUT /admin/mood`로 영역을 설정해야 고객이 곡을 신청할 수 있습니다.
+- **`returnedCount` 제거:** 영역 설정 응답(`RegionResult`)에서 `returnedCount`가 제거되었습니다. 반환한 곡 수는 `tracks.length`를 사용해 주십시오.
 - **에러 코드:** `CUSTOMER_UNAUTHORIZED`, `INVALID_KAKAO_CODE`, `KAKAO_UNAVAILABLE`이 추가되었습니다.
 
 ## 1. 공통 규칙
@@ -66,7 +67,6 @@ type RegionResult<T> = {
   tracks: T[];
   status: 'complete' | 'insufficient-candidates' | 'empty';
   candidateCount: number;  // 기준곡을 포함한 영역 안의 고유 후보 곡 수
-  returnedCount: number;   // tracks.length와 같습니다.
 };
 
 type QueueEntry = {
@@ -588,7 +588,6 @@ type TrackRequestEntry = {
 | `tracks` | 새 카탈로그입니다. 형식은 `GET /catalog`와 같습니다(`TrackWithStatus[]`). |
 | `status` | `complete`는 `n`곡을 모두 채운 경우, `insufficient-candidates`는 후보가 `n`곡보다 적어 일부만 채운 경우, `empty`는 후보가 없어 0곡인 경우입니다. |
 | `candidateCount` | 기준곡을 포함한 영역 안의 고유 후보 곡 수입니다. |
-| `returnedCount` | 반환한 곡 수이며 `tracks.length`와 같습니다. |
 
 `status`가 `empty`이면 카탈로그가 비어 있어 고객이 곡을 신청할 수 없고 `GET /admin/fallback-track`은 409 Conflict(`NO_TRACKS`)를 반환합니다. 관리자 화면에서 영역을 다시 설정하도록 안내해 주십시오.
 
@@ -607,14 +606,13 @@ type TrackRequestEntry = {
     }
   ],
   "status": "insufficient-candidates",
-  "candidateCount": 1,
-  "returnedCount": 1
+  "candidateCount": 1
 }
 ```
 
 후보가 없는 경우의 응답은 다음과 같습니다.
 ```json
-{ "tracks": [], "status": "empty", "candidateCount": 0, "returnedCount": 0 }
+{ "tracks": [], "status": "empty", "candidateCount": 0 }
 ```
 
 ### GET /admin/mood/preview
@@ -651,8 +649,7 @@ type TrackRequestEntry = {
     }
   ],
   "status": "insufficient-candidates",
-  "candidateCount": 1,
-  "returnedCount": 1
+  "candidateCount": 1
 }
 ```
 

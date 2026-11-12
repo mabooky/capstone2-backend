@@ -35,7 +35,7 @@ test('Store catalog update preserves queue, playback, cooldown, admin token; fai
     store.enqueue('client-b',id(2));
     const previous = store.getState('client-b');
     const preview = store.getRegionPreview(seedRequest);
-    assert.equal(preview.returnedCount,4);
+    assert.equal(preview.tracks.length,4);
     assert.deepEqual(store.getState('client-b'),previous);
     store.setRegionCatalog({...range,valenceMin:.9,valenceMax:1,energyMin:.9,energyMax:1});
     const next = store.getState('client-b');
@@ -96,7 +96,7 @@ test('real production routers: login, catalog, request, state, playback, isolati
     const generated=await request('one/admin/mood','PUT',seedRequest,token);
     assert.equal(generated.status,200);
     assert.equal(generated.body.status,'complete');
-    assert.equal(generated.body.returnedCount,4);
+    assert.equal(generated.body.tracks.length,4);
     assert.equal(generated.body.candidateCount,4);
     assert.ok(generated.body.tracks.every(t=>t.requestStatus==='available'));
     for(const key of seedRequest.spotifyIds) assert.ok(generated.body.tracks.some(t=>t.spotifyId===key));
@@ -120,7 +120,7 @@ test('real production routers: login, catalog, request, state, playback, isolati
     const preview=await request(`one/admin/mood/preview?${query}`,'GET',undefined,token);
     assert.equal(preview.status,200);
     assert.equal(preview.body.status,'complete');
-    assert.equal(preview.body.returnedCount,4);
+    assert.equal(preview.body.tracks.length,4);
     assert.ok(preview.body.tracks.every(t=>!('requestStatus' in t)));
     assert.deepEqual((await request('one/state')).body,before);
     const rangePreview=new URLSearchParams({...range});
@@ -141,12 +141,12 @@ test('real production routers: login, catalog, request, state, playback, isolati
     }
     const shortage=await request('one/admin/mood','PUT',range,token);
     assert.equal(shortage.body.status,'insufficient-candidates');
-    assert.equal(shortage.body.returnedCount,4);
+    assert.equal(shortage.body.tracks.length,4);
     assert.deepEqual((await request('one/state')).body.queue,before.queue);
     assert.deepEqual((await request('one/state')).body.nowPlaying,before.nowPlaying);
     const emptyRequest={...range,valenceMin:-1,valenceMax:-.9,energyMin:-1,energyMax:-.9};
     const empty=await request('one/admin/mood','PUT',emptyRequest,token);
-    assert.deepEqual(empty.body,{tracks:[],status:'empty',candidateCount:0,returnedCount:0});
+    assert.deepEqual(empty.body,{tracks:[],status:'empty',candidateCount:0});
     assert.deepEqual((await request('one/catalog')).body,[]);
     assert.notEqual((await request('one/state')).body.catalogHash,before.catalogHash);
     assert.deepEqual((await request('one/mood')).body.region,emptyRequest);
