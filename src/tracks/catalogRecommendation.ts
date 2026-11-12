@@ -1,4 +1,4 @@
-import { ApiError } from '../errors.js';
+import { CatalogRequestError } from './catalogRequestError.js';
 import type { Track } from './track.js';
 
 /** Product model A only. Track.arousal is normalized ReccoBeats Energy. */
@@ -15,7 +15,7 @@ type Point = { valence: number; arousal: number };
 const BUFFER = 0.1;
 // Absolute tolerance in normalized coordinates for floating point boundary calculations.
 const EPS = 1e-12;
-function invalid(message: string): never { throw new ApiError(400, 'INVALID_INPUT', message); }
+function invalid(message: string): never { throw new CatalogRequestError(message); }
 function coordinate(value: unknown): value is number {
     return typeof value === 'number' && Number.isFinite(value) && value >= -1 && value <= 1;
 }
@@ -96,7 +96,7 @@ export function recommendCatalog(library: readonly Track[], input: CatalogReques
     const request = parseCatalogRequest(input);
     const seeds: Track[] = request.mode === 'seeds' ? request.spotifyIds.map(id => {
         const track = library.find(track => track.spotifyId === id);
-        if (!track || !hasValidCoordinates(track)) throw new ApiError(400, 'INVALID_INPUT', '기준곡이 없거나 유효한 감정 좌표가 없습니다.');
+        if (!track || !hasValidCoordinates(track)) throw new CatalogRequestError('기준곡이 없거나 유효한 감정 좌표가 없습니다.');
         return track;
     }) : [];
     const polygon = hull(seeds);

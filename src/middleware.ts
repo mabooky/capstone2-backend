@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, Request, RequestHandler } from 'express';
 import { ApiError } from './errors.js';
+import { CatalogRequestError } from './tracks/catalogRequestError.js';
 import type { Store } from './store.js';
 import { findUserBySessionHash } from './db/sessionRepository.js';
 import type { UserRow } from './db/userRepository.js';
@@ -20,6 +21,12 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
                 ...(error.retryAfterSec !== undefined && { retryAfterSec: error.retryAfterSec }),
             },
         });
+        return;
+    }
+
+    // 곡 모듈은 HTTP를 모르므로, 카탈로그 요청 오류를 여기서 400 INVALID_INPUT으로 바꿉니다.
+    if (error instanceof CatalogRequestError) {
+        res.status(400).json({ error: { code: 'INVALID_INPUT', message: error.message } });
         return;
     }
 
