@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
-import { createTrackLibrary, type TrackLibrary } from './tracks/trackLibrary.js';
+import type { TrackLibrary } from './tracks/trackLibrary.js';
+import { loadTrackLibrary } from './tracks/loadTrackLibrary.js';
 import { errorHandler, resolveStore } from './middleware.js';
 import { authRouter } from './routes/authRouter.js';
 import { createMeRouter } from './routes/meRouter.js';
 import { storeRouter } from './routes/storeRouter.js';
 import { findAllStores } from './db/storeRepository.js';
-import { findAllTracks } from './db/trackRepository.js';
 import { Store } from './store.js';
 
 /**
@@ -34,7 +34,7 @@ async function createStores(trackLibrary: TrackLibrary): Promise<Store[]> {
 }
 
 export async function createApp() {
-    const globalTrackLibrary = createTrackLibrary(await findAllTracks());
+    const globalTrackLibrary = await loadTrackLibrary();
     console.log(`곡 ${globalTrackLibrary.size}개를 불러왔습니다.`);
     const stores = await createStores(globalTrackLibrary);
 

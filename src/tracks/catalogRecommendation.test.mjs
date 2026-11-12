@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recommendCatalog, parseCatalogRequest } from './catalogRecommendation.js';
-import { createTrackLibrary } from './trackLibrary.js';
+import { createTrackLibraryFrom } from './trackLibrary.js';
 
 const id = n => String(n).padStart(22, '0');
 const track = (n, x, y) => ({ spotifyId: id(n), valence: x, arousal: y, title: `track ${n}`, artist: 'artist', duration: 1000, albumImageUrl: '' });
@@ -38,7 +38,7 @@ test('invalid coordinates and out-of-space songs are excluded, IDs deduplicated'
     const library = [track(1, 0, 0),track(1, 0, 0),track(2, NaN, 0),track(3, 0, Infinity),
         track(4, 1.01, 0),track(5, 0, -1.01),track(6, null, 0),track(7, 0, 0)];
     // Validation/deduplication now happens once at the library initialization boundary.
-    const prepared = createTrackLibrary(library.map(t => ({spotify_id:t.spotifyId, title:t.title,
+    const prepared = createTrackLibraryFrom(library.map(t => ({spotify_id:t.spotifyId, title:t.title,
         artist:t.artist, duration_ms:t.duration, valence:t.valence === null ? null : (t.valence + 1) / 2,
         energy:(t.arousal + 1) / 2})));
     const result = prepared.recommend(range());

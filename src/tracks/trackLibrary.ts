@@ -15,9 +15,9 @@ export interface TrackLibrary {
 }
 
 /** Pure in-memory snapshot built from tracks_v3 rows; never opens a database. */
-export function createTrackLibrary(rows: readonly TrackRow[]): TrackLibrary {
+export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary {
     // [0, 1] 값을 [-1, 1]로 바꿉니다. 범위를 벗어나거나 숫자가 아니면 NaN입니다.
-    // createTrackLibrary는 시작할 때 한 번만 호출되므로 이 함수를 안에 두어도 비용이 없습니다.
+    // createTrackLibraryFrom은 시작할 때 한 번만 호출되므로 이 함수를 안에 두어도 비용이 없습니다.
     function normalize(value: unknown): number {
         if ((typeof value !== 'number' && typeof value !== 'string') || (typeof value === 'string' && !value.trim())) return Number.NaN;
         const raw = Number(value);

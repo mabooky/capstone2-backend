@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTrackLibrary } from './trackLibrary.js';
+import { createTrackLibraryFrom } from './trackLibrary.js';
 
 const id = n => String(n).padStart(22, '0');
 const row = (n, title, valence = .5, energy = .5) => ({
@@ -13,7 +13,7 @@ test('recommendation keeps first valid duplicate, lookup keeps last row, search 
         row(1, 'Later valid', .9), row(1, 'Invalid last', ''), row(3, 'Third'),
         row(4, 'Out of bounds', 2), row(5, 'Missing energy', .5, null)];
     const snapshot = structuredClone(rows);
-    const library = createTrackLibrary(rows);
+    const library = createTrackLibraryFrom(rows);
     const first = library.recommend(range, () => .25);
     assert.equal(first.candidateCount, 3);
     assert.equal(first.status, 'insufficient-candidates');
