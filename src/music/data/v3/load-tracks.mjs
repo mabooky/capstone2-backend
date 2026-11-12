@@ -21,7 +21,8 @@
 //
 // 적재 규칙
 //   - 오디오 값은 응답 원본 그대로 저장합니다. key, mode는 musical_key, musical_mode 열에 저장합니다.
-//   - 한국 재생 불가 곡, 연주곡, 같은 곡의 여러 버전도 걸러내거나 합치지 않습니다.
+//   - 한국에서 재생할 수 없는 곡(availableCountries에 KR이 없는 곡)은 오디오 값을 받기 전에 제외하고 적재하지 않습니다.
+//   - 연주곡, 같은 곡의 여러 버전은 걸러내거나 합치지 않습니다.
 //   - 같은 spotify_id가 이미 있으면 artist_reccobeats_ids와 오디오 값만 갱신합니다.
 //
 // 시드 CSV의 아티스트 ID는 22자 ID, spotify:artist:ID, 아티스트 페이지 링크를 받으며 빈 행은 건너뜁니다.
@@ -55,7 +56,7 @@ const FEATURE_FIELDS = ['acousticness', 'danceability', 'energy', 'instrumentaln
 const FEATURE_COLUMNS = ['acousticness', 'danceability', 'energy', 'instrumentalness', 'liveness', 'loudness', 'speechiness', 'tempo', 'valence', 'musical_key', 'musical_mode'];
 const INSERT_COLUMNS = [
     'spotify_id', 'reccobeats_id', 'title', 'artist', 'artist_reccobeats_ids',
-    'duration_ms', 'popularity', 'isrc', 'kr_available', ...FEATURE_COLUMNS,
+    'duration_ms', 'popularity', 'isrc', ...FEATURE_COLUMNS,
 ];
 
 const USAGE = `사용법:
@@ -221,6 +222,7 @@ function extractSpotifyArtistId(value) {
 /**
  * 아티스트의 곡에서 Spotify ID, ReccoBeats ID, 제목을 읽을 수 없는 곡을 제외하고 인기도 내림차순으로 정렬합니다.
  * 제목으로 같은 곡을 합치거나 연주곡을 가르지 않으며, 그런 선별은 조회할 때 합니다.
+ * 한국 재생 가능 여부(krAvailable)는 곡에 기록만 하며, 적재할 때 collectAndInsert가 제외합니다.
  * 여러 아티스트의 목록에 있는 곡은 spotify_id가 같으므로 한 번만 적재됩니다.
  */
 function selectForArtist(tracks, options) {
@@ -564,7 +566,7 @@ function buildRow(t, f) {
     const unit = x => (Number.isFinite(x) && x >= 0 && x <= 1 ? x : null);
     return {
         spotify_id: t.spotifyId, reccobeats_id: t.reccobeatsId, title: t.title, artist: t.artist, artist_reccobeats_ids: t.artistIds,
-        duration_ms: t.durationMs, popularity: t.popularity, isrc: t.isrc, kr_available: t.krAvailable,
+        duration_ms: t.durationMs, popularity: t.popularity, isrc: t.isrc,
         valence: f.valence, energy: f.energy,
         acousticness: unit(f.acousticness), danceability: unit(f.danceability), instrumentalness: unit(f.instrumentalness),
         liveness: unit(f.liveness), speechiness: unit(f.speechiness),
@@ -592,6 +594,11 @@ async function collectAndInsert(options, seeds, existing, hasCollected) {
         console.log(`수집한 곡 ${tracks.size.toLocaleString('ko-KR')}곡을 ${options.tracksFile}에 저장했습니다. (다음 실행에서는 이 목록으로 이어서 진행합니다.)\n`);
     }
 
+    // 수집 파일에는 전체 곡을 남기고, 한국에서 재생할 수 없는 곡은 오디오 값을 받기 전에 뺍니다.
+    const collectedCount = tracks.size;
+    tracks = new Map([...tracks].filter(([, t]) => t.krAvailable));
+    const krUnavailableCount = collectedCount - tracks.size;
+
     mkdirSync(dirname(options.featuresFile), { recursive: true });
     const features = await fetchFeatures([...tracks.keys()], options.featuresFile);
     const noFeatures = [];
@@ -609,6 +616,7 @@ async function collectAndInsert(options, seeds, existing, hasCollected) {
     // ---------- 요약 ----------
     if (collected) {
         console.log(`\n=== 아티스트별 결과 (시드 CSV 이름 → ReccoBeats 이름 : 전체 곡 수 → 올릴 곡 수)`);
+        console.log('  (곡 앞의 -- 표시는 한국 재생 불가라서 적재에서 제외되며, 아래 곡 수에는 이런 곡도 포함되어 있습니다.)');
         for (const artist of collected.list) {
             const r = collected.results.get(artist.id);
             const note = r.totalElements > r.fetched ? ` (⚠ 전체 ${r.totalElements}곡 중 ${r.fetched}곡만 조회됨)` : '';
@@ -626,11 +634,11 @@ async function collectAndInsert(options, seeds, existing, hasCollected) {
         console.log(`  시드 ${seeds.length}개 → 아티스트 ${collected.artists.size}팀, 중복을 합친 곡 ${rows.length.toLocaleString('ko-KR')}곡 (요청 ${requestCount.toLocaleString('ko-KR')}회)`);
         console.log(`  Spotify ID를 읽을 수 없어 뺀 곡: ${noSpotifyId}곡`);
     } else {
-        console.log(`  수집 결과 파일의 곡 ${tracks.size.toLocaleString('ko-KR')}곡 중 올릴 곡 ${rows.length.toLocaleString('ko-KR')}곡 (요청 ${requestCount.toLocaleString('ko-KR')}회)`);
+        console.log(`  수집 결과 파일의 곡 ${collectedCount.toLocaleString('ko-KR')}곡 중 올릴 곡 ${rows.length.toLocaleString('ko-KR')}곡 (요청 ${requestCount.toLocaleString('ko-KR')}회)`);
     }
     const already = count(row => existing.spotifyIds.has(row.spotify_id));
     console.log(`  이 중 DB에 이미 있는 곡 ${already.toLocaleString('ko-KR')}곡 / 새로 들어갈 곡 ${(rows.length - already).toLocaleString('ko-KR')}곡`);
-    console.log(`  한국 재생 가능: ${count(row => row.kr_available).toLocaleString('ko-KR')}곡 / 불가 표시: ${count(row => !row.kr_available).toLocaleString('ko-KR')}곡`);
+    console.log(`  한국 재생 불가로 제외한 곡: ${krUnavailableCount.toLocaleString('ko-KR')}곡`);
     console.log(`  사분면(valence ≥ 0.5 / energy ≥ 0.5): 긍정·활기 ${quadrant(true, true)}, 긍정·차분 ${quadrant(true, false)}, 부정·활기 ${quadrant(false, true)}, 부정·차분 ${quadrant(false, false)}`);
     if (noFeatures.length > 0) console.log(`  오디오 값이 없어 제외한 곡: ${noFeatures.length.toLocaleString('ko-KR')}곡`);
     if (invalidRows.length > 0) {
