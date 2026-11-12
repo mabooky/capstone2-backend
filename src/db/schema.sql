@@ -4,7 +4,7 @@
 --
 -- 기존 테이블을 바꿀 때는 ALTER를 직접 실행하고 이 파일도 함께 고칩니다.
 
--- 곡. 한국 재생 불가 곡, 연주곡, 같은 곡의 여러 버전도 걸러내지 않고 저장하며
+-- 곡. 연주곡, 같은 곡의 여러 버전도 걸러내지 않고 저장하며
 -- 서비스에 노출할 곡은 조회할 때 정합니다. 오디오 값은 ReccoBeats 응답 원본입니다.
 CREATE TABLE IF NOT EXISTS tracks_v3 (
     spotify_id text PRIMARY KEY CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS tracks_v3 (
     duration_ms integer NOT NULL CHECK (duration_ms >= 0),
     popularity integer CHECK (popularity BETWEEN 0 AND 100),
     isrc text,
-    kr_available boolean NOT NULL, -- availableCountries에 KR 포함 여부
     acousticness double precision CHECK (acousticness BETWEEN 0 AND 1),
     danceability double precision CHECK (danceability BETWEEN 0 AND 1),
     energy double precision NOT NULL CHECK (energy BETWEEN 0 AND 1),
