@@ -14,7 +14,7 @@
 
 | 사용자 | 목표 사용 흐름 | 현재 코드와의 구분 |
 |---|---|---|
-| 점주 | 관리자 로그인 → 기준곡 또는 감정 범위 선택·정밀 조정 → 영역 기반 카탈로그 생성 → 재생·대기열·블랙리스트 관리 | 로그인·A 영역 카탈로그·대기열 관리·재생 보고 구현. 단일 기준점은 임시 호환, 블랙리스트는 향후 개발 |
+| 점주 | 관리자 로그인 → 기준곡 또는 감정 범위 선택·정밀 조정 → 영역 기반 카탈로그 생성 → 재생·대기열·블랙리스트 관리 | 로그인·A 영역 카탈로그·대기열 관리·재생 보고 구현. 블랙리스트는 향후 개발 |
 | 고객 | QR 접속 → 전화번호 기반 로그인·식별 → 카탈로그 확인 → 곡 신청·대기열 확인 → 재접속 후 신청 이력 조회 | 백엔드 신청·현재 상태 조회는 구현됨. QR 화면과 전체 프론트엔드 흐름은 이 저장소에서 확인되지 않았고 전화번호·영속 이력은 미구현 |
 
 - **전체 곡 라이브러리:** 현재 서버가 PostgreSQL `tracks_v3`에서 읽은 곡 집합이다. Spotify 전체 검색이 아니다.
@@ -40,7 +40,7 @@ Spotify ID로 중복 제거 후 기준곡을 확보하고 나머지를 균등 �
 결과도 무작위 순서로 반환하며 부족분을 영역 밖 곡으로 채우지 않는다.
 후보 부족과 0곡을 구분하는 결과 상태를 제공한다. 미등록·좌표 무효 기준곡 요청은 거부한다.
 공식 서비스는 `src/tracks/catalogRecommendation.ts` → 메모리 곡 라이브러리 → Store → 기존 `/admin/mood`로 연결했다.
-기존 단일 기준점 요청·초기 카탈로그는 임시 호환 기능으로 유지한다. 영역 요청만 결과 상태를 포함한 객체를 반환한다.
+기존 단일 기준점 요청은 제거했으며, 서버 시작 직후 카탈로그는 비어 있다. 영역 요청은 결과 상태를 포함한 객체를 반환한다.
 영역 미리보기도 기존 GET 경로에서 mode 쿼리로 지원하며 공개 `/catalog`는 기존 배열 응답을 유지한다.
 세부 입력·출력과 GET `/mood`의 추가 `region` 필드는 [API 명세](docs/API_SPEC.md)를 따른다.
 
@@ -58,13 +58,13 @@ Spotify ID로 중복 제거 후 기준곡을 확보하고 나머지를 균등 �
 | 구역 | 현재 구현·책임 |
 |---|---|
 | `src/index.ts`, `src/app.ts` | dotenv 로딩, 시작 시 곡 라이브러리 초기화, Express 앱·매장 구성·라우팅 |
-| `src/tracks/trackLibrary.ts`, `src/db/trackRepository.ts`, `src/tracks/catalogRecommendation.ts` | `trackRepository`가 `tracks_v3`를 조회하고 `app.ts`가 시작 시 한 번 라이브러리를 만든다. A 영역 추천·곡 조회·검색 및 임시 단일 좌표 호환 제공 |
-| `src/store.ts` | 매장별 기준점·카탈로그·대기열·재생 상태·쿨타임·관리자 토큰. 현재 모두 메모리 상태 |
+| `src/tracks/trackLibrary.ts`, `src/db/trackRepository.ts`, `src/tracks/catalogRecommendation.ts` | `trackRepository`가 `tracks_v3`를 조회하고 `app.ts`가 시작 시 한 번 라이브러리를 만든다. A 영역 추천·곡 조회·검색 제공 |
+| `src/store.ts` | 매장별 영역 설정·카탈로그·대기열·재생 상태·쿨타임·관리자 토큰. 현재 모두 메모리 상태 |
 | `src/routes/`, `src/middleware.ts`, `src/models/` | 매장·관리자 API, 입력·권한 검사, 서비스 Track 타입 |
 | `src/music/algorithm/`, `integration/`, `db/001~003` | 기존 5모델 추천, 실험 파일 어댑터, 주입형 SQL 저장소·서비스, 연구 계열 스키마·VIEW |
 | `src/music/data/experiment-v1/` | 27,948곡 공유 실험 데이터. 운영 `tracks_v3`와 동일한 데이터 집합이라고 가정하지 않음 |
 | `src/music/data/v2/`, `v3/` | 데이터 수집·적재 도구와 스키마. 존재 자체가 실행·업로드 승인을 뜻하지 않음 |
-| `docs/API_SPEC.md` | 서비스 계약 v0.8: v0.7 호환 + A 영역 입력/결과. 전화번호 API는 아직 정의하지 않음 |
+| `docs/API_SPEC.md` | 서비스 계약 v0.9: A 영역 입력/결과, 카카오 로그인·신청 이력. 단일 기준점 호환 제거. 전화번호 API는 아직 정의하지 않음 |
 
 기술 스택은 Node.js·TypeScript strict·ESM/NodeNext·Express 5·PostgreSQL이며 pnpm을 사용한다.
 프로젝트 지정 pnpm은 12.18.0이다. 구체적인 설치·검증 환경은 STATUS의 이전 단계 기록을 따른다.

@@ -363,7 +363,7 @@ null
 { "error": { "code": "CUSTOMER_UNAUTHORIZED", "message": "로그인이 필요합니다." } }
 
 // 403 Forbidden (OUT_OF_MOOD): 카탈로그를 다시 불러오고 안내 문구를 표시합니다.
-{ "error": { "code": "OUT_OF_MOOD", "message": "현재 영역의 범위를 벗어난 곡입니다." } }
+{ "error": { "code": "OUT_OF_MOOD", "message": "현재 카탈로그에 없는 곡입니다." } }
 
 // 429 Too Many Requests (TRACK_COOLDOWN)
 { "error": { "code": "TRACK_COOLDOWN", "message": "최근에 재생된 곡입니다.", "retryAfterSec": 1200 } }
