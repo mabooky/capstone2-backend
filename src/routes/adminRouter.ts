@@ -2,7 +2,7 @@ import express from 'express';
 import { verifyPassword } from '../auth/password.js';
 import { ApiError } from '../errors.js';
 import { requireAdmin } from '../middleware.js';
-import { bodyNumber, bodyString, queryNumber, regionQuery } from './input.js';
+import { bodyString, regionQuery } from './input.js';
 import { parseCatalogRequest } from '../tracks/catalogRecommendation.js';
 
 export const adminRouter = express.Router();
@@ -20,30 +20,11 @@ adminRouter.post('/login', async (req, res) => {
 adminRouter.use(requireAdmin);
 
 adminRouter.put('/mood', (req, res) => {
-    if (req.body?.mode !== undefined) {
-        res.json(res.locals.store.setRegionCatalog(parseCatalogRequest(req.body)));
-        return;
-    }
-    // Temporary compatibility: requests without mode keep the v0.7 point/array contract.
-    const catalog = res.locals.store.setMood(
-        bodyNumber(req.body, 'valence') ?? Number.NaN,
-        bodyNumber(req.body, 'arousal') ?? Number.NaN,
-        bodyNumber(req.body, 'n'),
-    );
-    res.json(catalog);
+    res.json(res.locals.store.setRegionCatalog(parseCatalogRequest(req.body)));
 });
 
 adminRouter.get('/mood/preview', (req, res) => {
-    if (req.query.mode !== undefined) {
-        res.json(res.locals.store.getRegionPreview(regionQuery(req.query)));
-        return;
-    }
-    const tracks = res.locals.store.getPreview(
-        queryNumber(req.query.valence) ?? Number.NaN,
-        queryNumber(req.query.arousal) ?? Number.NaN,
-        queryNumber(req.query.n),
-    );
-    res.json(tracks);
+    res.json(res.locals.store.getRegionPreview(regionQuery(req.query)));
 });
 
 adminRouter.get('/fallback-track', (req, res) => {

@@ -8,8 +8,6 @@ import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './
 
 /** 기준점에서 n을 따로 지정하지 않았을 때의 곡 수입니다. */
 const DEFAULT_N = 100;
-/** 카탈로그에 담을 수 있는 곡 수의 상한입니다. */
-const MAX_N = 100;
 
 export type Mood = { valence: number; arousal: number; n: number };
 
@@ -103,25 +101,6 @@ export class Store {
         return this.adminToken !== null && token === this.adminToken;
     }
 
-    /**
-     * PUT /admin/mood: 기준점을 통째로 교체하고 새 카탈로그를 돌려줍니다.
-     * 이미 대기열에 들어간 곡과 재생 기록은 그대로 유지합니다.
-     */
-    setMood(valence: number, arousal: number, n: number = DEFAULT_N): TrackWithStatus[] {
-        if (!(valence >= -1 && valence <= 1) || !(arousal >= -1 && arousal <= 1)) {
-            throw new ApiError(400, 'INVALID_INPUT', 'valence와 arousal은 -1 이상 1 이하여야 합니다.');
-        }
-        if (!Number.isInteger(n) || n < 1 || n > MAX_N) {
-            throw new ApiError(400, 'INVALID_INPUT', `n은 1 이상 ${MAX_N} 이하의 정수여야 합니다.`);
-        }
-        this.mood = { valence, arousal, n };
-        this.region = null;
-        this.catalog = this.trackLibrary.nearest(valence, arousal, n);
-        this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
-        this.catalogHash = hashCatalog(this.catalog);
-        return this.getCatalog();
-    }
-
     /** Validate and sample before committing any state; queue, playback and cooldowns are retained. */
     setRegionCatalog(input: CatalogRequest): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithStatus[] } {
         const request = parseCatalogRequest(input);
@@ -139,17 +118,6 @@ export class Store {
 
     getRegion(): CatalogRequest | null {
         return this.region && parseCatalogRequest(this.region);
-    }
-
-    /** GET /admin/mood/preview: 기준점을 바꾸지 않고, 해당 좌표에서 가까운 곡을 미리 조회합니다. */
-    getPreview(valence: number, arousal: number, n: number = DEFAULT_N): Track[] {
-        if (!(valence >= -1 && valence <= 1) || !(arousal >= -1 && arousal <= 1)) {
-            throw new ApiError(400, 'INVALID_INPUT', 'valence와 arousal은 -1 이상 1 이하여야 합니다.');
-        }
-        if (!Number.isInteger(n) || n < 1 || n > MAX_N) {
-            throw new ApiError(400, 'INVALID_INPUT', `n은 1 이상 ${MAX_N} 이하의 정수여야 합니다.`);
-        }
-        return this.trackLibrary.nearest(valence, arousal, n);
     }
 
     /** DELETE /admin/queue/:queueId: 대기열에서 곡을 제거합니다. 재생된 것이 아니므로 곡 쿨타임은 적용하지 않습니다. */

@@ -61,17 +61,6 @@ test('empty catalog retains hash and NO_TRACKS behavior, excludes out-of-catalog
     assert.throws(()=>store.getFallbackTrack(),error=>error.code==='NO_TRACKS');
     assert.throws(()=>store.enqueue('client',id(1)),error=>error.code==='OUT_OF_MOOD');
 });
-test('legacy point defaults, nearest ordering and response shape remain compatible', () => {
-    const store=makeStore();
-    assert.deepEqual(store.getMood(),{valence:0,arousal:0,n:100});
-    assert.deepEqual(store.getPreview(0,0,4).map(t=>t.spotifyId),[1,4,2,3].map(id));
-    store.setRegionCatalog(seedRequest);
-    const result=store.setMood(0,0,2);
-    assert.ok(Array.isArray(result));
-    assert.deepEqual(result.map(t=>t.spotifyId),[1,4].map(id));
-    assert.deepEqual(store.getMood(),{valence:0,arousal:0,n:2});
-    assert.equal(store.getRegion(),null);
-});
 test('real production routers: login, catalog, request, state, playback, isolation on synthetic memory library', async t => {
     const store = makeStore('one'), other = makeStore('two');
     const app = express(); app.use(express.json());
@@ -150,11 +139,12 @@ test('real production routers: login, catalog, request, state, playback, isolati
     assert.deepEqual((await request('one/catalog')).body,[]);
     assert.notEqual((await request('one/state')).body.catalogHash,before.catalogHash);
     assert.deepEqual((await request('one/mood')).body.region,emptyRequest);
-    const legacyPreview=await request('one/admin/mood/preview?valence=0&arousal=0&n=2','GET',undefined,token);
-    assert.ok(Array.isArray(legacyPreview.body));
-    assert.deepEqual(legacyPreview.body.map(t=>t.spotifyId),[1,4].map(id));
-    const legacy=await request('one/admin/mood','PUT',{valence:0,arousal:0,n:2},token);
-    assert.ok(Array.isArray(legacy.body));
-    assert.deepEqual((await request('one/mood')).body,{valence:0,arousal:0,n:2});
+    const afterEmpty=(await request('one/state')).body;
+    const modeless=await request('one/admin/mood','PUT',{valence:0,arousal:0,n:2},token);
+    assert.equal(modeless.status,400);
+    assert.equal(modeless.body.error.code,'INVALID_INPUT');
+    assert.equal((await request('one/admin/mood/preview?valence=0&arousal=0&n=2','GET',undefined,token)).status,400);
+    assert.deepEqual((await request('one/state')).body,afterEmpty);
+    assert.deepEqual((await request('one/mood')).body.region,emptyRequest);
     assert.deepEqual((await request('two/state')).body,otherBefore);
 });
