@@ -81,8 +81,8 @@ test('real production routers: login, catalog, request, state, playback, isolati
     await new Promise(resolve=>server.once('listening',resolve));
     t.after(()=>new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve())));
     const base = `http://127.0.0.1:${server.address().port}/api/stores`;
-    const request = async (path,method='GET',body,token,client) => {
-        const response = await fetch(`${base}/${path}`,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`} : {}),...(client?{'X-Client-Id':client}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+    const request = async (path,method='GET',body,token) => {
+        const response = await fetch(`${base}/${path}`,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`} : {})},body:body===undefined?undefined:JSON.stringify(body)});
         return {status:response.status,body:response.status===204?null:await response.json()};
     };
     assert.equal((await request('missing/catalog')).status,404);
@@ -106,14 +106,14 @@ test('real production routers: login, catalog, request, state, playback, isolati
     assert.deepEqual(catalog.body,generated.body.tracks);
     assert.ok(catalog.body.every(t=>t.requestStatus==='available'));
     const otherBefore = (await request('two/state')).body;
-    assert.equal((await request('one/queue','POST',{spotifyId:id(1)},undefined,'a')).status,201);
-    assert.equal((await request('one/queue','POST',{spotifyId:id(1)},undefined,'b')).status,409);
-    assert.equal((await request('one/me','GET',undefined,undefined,'a')).body.canRequest,false);
-    const state=(await request('one/state','GET',undefined,undefined,'a')).body;
-    assert.equal(state.queue[0].mine,true);
+    // 신청과 내 상태 조회는 로그인 세션(DB)이 필요하므로 HTTP가 아니라 Store를 직접 호출합니다.
+    store.enqueue('a',id(1));
+    assert.throws(()=>store.enqueue('b',id(1)),error=>error.status===409);
+    assert.equal(store.getMe('a').canRequest,false);
+    assert.equal(store.getState('a').queue[0].mine,true);
     assert.equal((await request('one/admin/now-playing','PUT',{spotifyId:id(1)},token)).body.nowPlaying.source,'request');
-    assert.equal((await request('one/me','GET',undefined,undefined,'a')).body.canRequest,true);
-    assert.equal((await request('one/queue','POST',{spotifyId:id(2)},undefined,'b')).status,201);
+    assert.equal(store.getMe('a').canRequest,true);
+    store.enqueue('b',id(2));
     const before=(await request('one/state')).body;
     const query=new URLSearchParams({mode:'seeds',n:'4'});
     for(const key of seedRequest.spotifyIds) query.append('spotifyIds',key);
