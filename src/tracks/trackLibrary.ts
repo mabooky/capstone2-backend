@@ -8,8 +8,6 @@ export interface TrackLibrary {
     readonly size: number;
     recommend(input: CatalogRequest, random?: () => number): CatalogResult;
     get(spotifyId: string): Track | undefined;
-    /** 기준점에서 가까운 순서로 n곡을 돌려줍니다. 기존 단일 기준점 API 호환 경로입니다. */
-    nearest(valence: number, arousal: number, n: number): Track[];
     /** 제목과 아티스트에서 검색어를 찾습니다. 검색어로 시작하는 곡을 먼저 돌려줍니다. */
     search(query: string, limit: number, offset: number): { total: number; tracks: Track[] };
 }
@@ -24,7 +22,7 @@ export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary 
         return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? 2 * raw - 1 : Number.NaN;
     }
 
-    // 거리가 같은 곡의 순서를 DB의 문자 정렬 규칙과 무관하게 정하려고, Spotify ID를 단순 비교로 정렬합니다.
+    // 추천 후보와 검색 결과의 순서를 DB의 문자 정렬 규칙과 무관하게 고정하려고, Spotify ID를 단순 비교로 정렬합니다.
     const tracks: Track[] = [...rows]
         .sort((a, b) => (a.spotify_id < b.spotify_id ? -1 : a.spotify_id > b.spotify_id ? 1 : 0))
         .map(row => ({
@@ -45,8 +43,6 @@ export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary 
         recommendationIds.add(track.spotifyId);
         return true;
     });
-    const valences = Float64Array.from(tracks, track => track.valence);
-    const arousals = Float64Array.from(tracks, track => track.arousal);
     const searchTexts = tracks.map(track => `${track.title}\n${track.artist}`.toLowerCase());
 
     return {
@@ -58,18 +54,6 @@ export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary 
 
         get(spotifyId: string): Track | undefined {
             return byId.get(spotifyId);
-        },
-
-        nearest(valence: number, arousal: number, n: number): Track[] {
-            const distances = new Float64Array(tracks.length);
-            for (let i = 0; i < tracks.length; i++) {
-                const dv = valences[i] - valence;
-                const da = arousals[i] - arousal;
-                distances[i] = dv * dv + da * da;
-            }
-            // 정렬은 안정 정렬이므로, 거리가 같으면 위에서 정렬해 둔 Spotify ID 순서가 유지됩니다.
-            const order = Array.from(tracks.keys()).filter(i => hasValidCoordinates(tracks[i])).sort((a, b) => distances[a] - distances[b]);
-            return order.slice(0, Math.max(0, n)).map(index => tracks[index]);
         },
 
         search(query: string, limit: number, offset: number): { total: number; tracks: Track[] } {
