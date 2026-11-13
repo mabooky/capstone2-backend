@@ -12,7 +12,7 @@ storeRouter.get('/', (req, res) => {
 });
 
 storeRouter.get('/mood', (req, res) => {
-    res.json(res.locals.store.getMood());
+    res.json(res.locals.store.getRegion());
 });
 
 storeRouter.get('/catalog', (req, res) => {

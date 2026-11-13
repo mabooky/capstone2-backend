@@ -53,6 +53,13 @@ test('Store catalog update preserves queue, playback, cooldown, admin token; fai
     const copy = store.getRegion(); copy.n=1;
     assert.equal(store.getRegion().n,100);
 });
+test('new Store starts with an empty catalog and no region', () => {
+    const store = makeStore();
+    assert.deepEqual(store.getCatalog(),[]);
+    assert.equal(store.getRegion(),null);
+    assert.throws(()=>store.getFallbackTrack(),error=>error.code==='NO_TRACKS');
+    assert.throws(()=>store.enqueue('client',id(1)),error=>error.code==='OUT_OF_MOOD');
+});
 test('empty catalog retains hash and NO_TRACKS behavior, excludes out-of-catalog requests', () => {
     const store = makeStore();
     const result = store.setRegionCatalog({...range,valenceMin:-1,valenceMax:-.9,energyMin:-1,energyMax:-.9});
@@ -75,6 +82,8 @@ test('real production routers: login, catalog, request, state, playback, isolati
         return {status:response.status,body:response.status===204?null:await response.json()};
     };
     assert.equal((await request('missing/catalog')).status,404);
+    assert.equal((await request('one/mood')).body,null);
+    assert.deepEqual((await request('one/catalog')).body,[]);
     assert.equal((await request('one/admin/fallback-track')).status,401);
     assert.equal((await request('one/admin/mood','PUT',seedRequest)).status,401);
     assert.equal((await request('one/admin/mood/preview?mode=range')).status,401);
@@ -89,7 +98,7 @@ test('real production routers: login, catalog, request, state, playback, isolati
     assert.equal(generated.body.candidateCount,4);
     assert.ok(generated.body.tracks.every(t=>t.requestStatus==='available'));
     for(const key of seedRequest.spotifyIds) assert.ok(generated.body.tracks.some(t=>t.spotifyId===key));
-    assert.deepEqual((await request('one/mood')).body.region,seedRequest);
+    assert.deepEqual((await request('one/mood')).body,seedRequest);
     const catalog = await request('one/catalog');
     assert.equal(catalog.body.length,4);
     assert.deepEqual(catalog.body,generated.body.tracks);
@@ -121,7 +130,7 @@ test('real production routers: login, catalog, request, state, playback, isolati
         assert.equal(bad.status,400);
         assert.equal(bad.body.error.code,'INVALID_INPUT');
         assert.deepEqual((await request('one/state')).body,before);
-        assert.deepEqual((await request('one/mood')).body.region,seedRequest);
+        assert.deepEqual((await request('one/mood')).body,seedRequest);
     }
     for(const suffix of ['mode=range&n=2&valenceMin=0&valenceMax=1&energyMin=0&energyMax=1&view=C1',
         'mode=seeds&n=4&spotifyIds=bad', 'mode=unknown&n=2',
@@ -138,13 +147,13 @@ test('real production routers: login, catalog, request, state, playback, isolati
     assert.deepEqual(empty.body,{tracks:[],status:'empty',candidateCount:0});
     assert.deepEqual((await request('one/catalog')).body,[]);
     assert.notEqual((await request('one/state')).body.catalogHash,before.catalogHash);
-    assert.deepEqual((await request('one/mood')).body.region,emptyRequest);
+    assert.deepEqual((await request('one/mood')).body,emptyRequest);
     const afterEmpty=(await request('one/state')).body;
     const modeless=await request('one/admin/mood','PUT',{valence:0,arousal:0,n:2},token);
     assert.equal(modeless.status,400);
     assert.equal(modeless.body.error.code,'INVALID_INPUT');
     assert.equal((await request('one/admin/mood/preview?valence=0&arousal=0&n=2','GET',undefined,token)).status,400);
     assert.deepEqual((await request('one/state')).body,afterEmpty);
-    assert.deepEqual((await request('one/mood')).body.region,emptyRequest);
+    assert.deepEqual((await request('one/mood')).body,emptyRequest);
     assert.deepEqual((await request('two/state')).body,otherBefore);
 });

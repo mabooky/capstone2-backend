@@ -6,11 +6,6 @@ import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithStatus } from './models/trackWithStatus.js';
 import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './tracks/catalogRecommendation.js';
 
-/** 기준점에서 n을 따로 지정하지 않았을 때의 곡 수입니다. */
-const DEFAULT_N = 100;
-
-export type Mood = { valence: number; arousal: number; n: number };
-
 type PlaySource = 'request' | 'fallback';
 
 /** 서버가 저장하는 대기열의 한 곡입니다. userId는 서버 안에서만 쓰고 응답으로 내보내지 않습니다. */
@@ -62,13 +57,12 @@ export class Store {
     private readonly now: () => number;
     private readonly random: () => number;
 
-    private mood: Mood = { valence: 0, arousal: 0, n: DEFAULT_N };
     private region: CatalogRequest | null = null;
-    /** Active sampled region catalog, or the temporary legacy point catalog. */
-    private catalog: Track[];
-    private catalogIds: Set<string>;
+    /** 현재 카탈로그입니다. 서버를 시작한 직후에는 영역을 설정하기 전이므로 비어 있습니다. */
+    private catalog: Track[] = [];
+    private catalogIds: Set<string> = new Set();
     /** 카탈로그의 곡 목록(순서 포함)에서 계산한 8자리 16진수 해시입니다. 목록이 같으면 같은 값입니다. */
-    private catalogHash: string;
+    private catalogHash: string = hashCatalog([]);
     private queue: QueueEntryServer[] = [];
     private nowPlaying: NowPlayingEntry | null = null;
     /** 곡별로 마지막에 재생이 시작된 시각입니다. */
@@ -85,9 +79,6 @@ export class Store {
         this.trackCooldownMs = options.trackCooldownMs;
         this.now = options.now ?? Date.now;
         this.random = options.random ?? Math.random;
-        this.catalog = trackLibrary.nearest(this.mood.valence, this.mood.arousal, this.mood.n);
-        this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
-        this.catalogHash = hashCatalog(this.catalog);
     }
 
     /** 새 관리자 토큰을 발급하고, 이전에 발급한 토큰은 무효로 만듭니다. 비밀번호 확인은 호출하는 쪽에서 마쳐야 합니다. */
@@ -125,12 +116,6 @@ export class Store {
         const index = this.queue.findIndex(entry => entry.queueId === queueId);
         if (index === -1) throw new ApiError(404, 'QUEUE_ITEM_NOT_FOUND', '존재하지 않는 대기열 항목입니다.');
         this.queue.splice(index, 1);
-    }
-
-    getMood(): Mood & { region?: CatalogRequest } {
-        // Preserve the legacy fields; region is the active official configuration when present.
-        const region = this.getRegion();
-        return { ...this.mood, ...(region && { region }) };
     }
 
     /** 곡의 신청 상태를 정합니다. 여러 상태에 해당하면 아래 순서에서 가장 앞선 하나를 돌려줍니다. */
@@ -210,7 +195,7 @@ export class Store {
         const track = this.trackLibrary.get(spotifyId);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
         if (!this.catalogIds.has(spotifyId)) {
-            throw new ApiError(403, 'OUT_OF_MOOD', '현재 기준점의 범위를 벗어난 곡입니다.');
+            throw new ApiError(403, 'OUT_OF_MOOD', '현재 카탈로그에 없는 곡입니다.');
         }
         const status = this.statusOf(track);
         if (status === 'now-playing' || status === 'already-queued') {
@@ -263,7 +248,7 @@ export class Store {
             takeFromQueue = true;
         } else {
             if (!this.catalogIds.has(spotifyId)) {
-                throw new ApiError(403, 'OUT_OF_MOOD', '현재 기준점의 범위를 벗어난 곡입니다.');
+                throw new ApiError(403, 'OUT_OF_MOOD', '현재 카탈로그에 없는 곡입니다.');
             }
             source = 'fallback';
         }
