@@ -11,9 +11,9 @@ CREATE TABLE IF NOT EXISTS tracks_v3 (
     reccobeats_id uuid NOT NULL,
     title text NOT NULL CHECK (btrim(title) <> ''),
     artist text NOT NULL CHECK (btrim(artist) <> ''), -- 참여 아티스트 이름을 ', '로 이은 문자열
-    artist_spotify_ids text[] CHECK (cardinality(artist_spotify_ids) > 0), -- artist와 같은 순서, 수집 전에는 NULL
+    artist_reccobeats_ids uuid[] NOT NULL CHECK (cardinality(artist_reccobeats_ids) > 0), -- artist와 같은 순서
     duration_ms integer NOT NULL CHECK (duration_ms >= 0),
-    play_count bigint CHECK (play_count >= 0), -- Spotify 재생 수, 수집 전에는 NULL
+    popularity integer CHECK (popularity BETWEEN 0 AND 100),
     isrc text,
     acousticness double precision CHECK (acousticness BETWEEN 0 AND 1),
     danceability double precision CHECK (danceability BETWEEN 0 AND 1),
@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS tracks_v3 (
     musical_key smallint CHECK (musical_key BETWEEN -1 AND 11), -- 0=C, ..., 11=B, -1=감지 실패
     musical_mode smallint CHECK (musical_mode IN (0, 1)) -- 0=단조, 1=장조
 );
+
+CREATE INDEX IF NOT EXISTS tracks_v3_artists_idx ON tracks_v3 USING gin (artist_reccobeats_ids);
 
 -- 매장. id는 서버가 무작위로 생성하며 고객에게 노출되는 매장 주소에 쓰입니다.
 CREATE TABLE IF NOT EXISTS stores (
