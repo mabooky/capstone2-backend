@@ -44,12 +44,12 @@ CREATE TABLE IF NOT EXISTS albums_v4 (
     cover_url_300 text,
     cover_url_64 text
 );
-
+    
 -- 곡. 서비스에서 추천하고 재생하는 단위입니다.
 -- valence, arousal은 [-1, 1] 범위로 정규화한 값이며, 값이 없는 곡은 저장하지 않습니다.
 CREATE TABLE IF NOT EXISTS tracks_v4 (
     spotify_id text PRIMARY KEY CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
-    reccobeats_id uuid, -- ReccoBeats의 곡 ID. 오디오를 올려서 값을 얻은 곡은 없을 수 있습니다.
+    reccobeats_id uuid NOT NULL,
     title text NOT NULL CHECK (btrim(title) <> ''),
     artist text NOT NULL CHECK (btrim(artist) <> ''), -- 참여 아티스트 이름을 ', '로 이은 표시용 문자열
     artist_spotify_ids text[] NOT NULL CHECK (cardinality(artist_spotify_ids) > 0), -- artist와 같은 순서
