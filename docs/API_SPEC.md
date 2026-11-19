@@ -45,11 +45,14 @@ type RequestStatus =
   | 'recently-played';  // 재생 시작 후 30분 이내 (곡 쿨타임)
 
 type Track = {
-  spotifyId: string;       // Spotify Track ID (22자). 곡의 유일한 식별자입니다.
+  id: string;              // Spotify Track ID (22자). 곡의 유일한 식별자입니다.
   title: string;
-  artist: string;
+  artist: string;          // 참여 아티스트 이름을 ', '로 이은 표시용 문자열
+  artistIds: string[];     // Spotify 아티스트 ID. artist와 같은 순서
   duration: number;        // ms
-  albumImageUrl: string;
+  playCount: number;       // Spotify 누적 재생 수. 값이 없는 곡은 0
+  albumId: string;         // Spotify 앨범 ID
+  albumThumbUrl: string | null;  // 64픽셀 앨범 커버. 없으면 null
   valence: number;         // [-1, 1]
   arousal: number;         // [-1, 1] 이름은 arousal이지만 값은 Energy입니다.
 };
@@ -175,41 +178,41 @@ null
 ```json
 [
   {
-    "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7",
+    "id": "0aB1cD2eF3gH4iJ5kL6mN7",
     "title": "Don't Know Why",
     "artist": "Norah Jones",
     "duration": 186000,
-    "albumImageUrl": "https://example.com/mock/cover1.jpg",
+    "albumThumbUrl": "https://example.com/mock/cover1.jpg",
     "valence": 0.18,
     "arousal": -0.22,
     "requestStatus": "available"
   },
   {
-    "spotifyId": "7xK2pQ9rT4vW1yZ6bC8dE3",
+    "id": "7xK2pQ9rT4vW1yZ6bC8dE3",
     "title": "Yellow (Acoustic)",
     "artist": "Coldplay",
     "duration": 269000,
-    "albumImageUrl": "https://example.com/mock/cover2.jpg",
+    "albumThumbUrl": "https://example.com/mock/cover2.jpg",
     "valence": 0.05,
     "arousal": -0.05,
     "requestStatus": "already-queued"
   },
   {
-    "spotifyId": "3mN5oP7qR9sT1uV3wX5yZ7",
+    "id": "3mN5oP7qR9sT1uV3wX5yZ7",
     "title": "Mock Track Three",
     "artist": "Mock Artist",
     "duration": 201000,
-    "albumImageUrl": "https://example.com/mock/cover3.jpg",
+    "albumThumbUrl": "https://example.com/mock/cover3.jpg",
     "valence": 0.31,
     "arousal": 0.02,
     "requestStatus": "now-playing"
   },
   {
-    "spotifyId": "9aC2eG4iK6mO8qS0uW2yA4",
+    "id": "9aC2eG4iK6mO8qS0uW2yA4",
     "title": "Mock Recently Played",
     "artist": "Mock Artist",
     "duration": 233000,
-    "albumImageUrl": "https://example.com/mock/cover4.jpg",
+    "albumThumbUrl": "https://example.com/mock/cover4.jpg",
     "valence": 0.22,
     "arousal": -0.12,
     "requestStatus": "recently-played"
@@ -242,21 +245,21 @@ null
   "total": 2,
   "tracks": [
     {
-      "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7",
+      "id": "0aB1cD2eF3gH4iJ5kL6mN7",
       "title": "Don't Know Why",
       "artist": "Norah Jones",
       "duration": 186000,
-      "albumImageUrl": "https://example.com/mock/cover1.jpg",
+      "albumThumbUrl": "https://example.com/mock/cover1.jpg",
       "valence": 0.18,
       "arousal": -0.22,
       "requestStatus": "available"
     },
     {
-      "spotifyId": "5bD3fH5jL7nP9rT1vX3zB5",
+      "id": "5bD3fH5jL7nP9rT1vX3zB5",
       "title": "Mock High Energy Song",
       "artist": "Norah Mock",
       "duration": 233000,
-      "albumImageUrl": "https://example.com/mock/cover5.jpg",
+      "albumThumbUrl": "https://example.com/mock/cover5.jpg",
       "valence": 0.7,
       "arousal": 0.92,
       "requestStatus": "out-of-mood"
@@ -283,11 +286,11 @@ null
   "catalogHash": "9f3a1c7e",
   "nowPlaying": {
     "track": {
-      "spotifyId": "3mN5oP7qR9sT1uV3wX5yZ7",
+      "id": "3mN5oP7qR9sT1uV3wX5yZ7",
       "title": "Mock Track Three",
       "artist": "Mock Artist",
       "duration": 201000,
-      "albumImageUrl": "https://example.com/mock/cover3.jpg",
+      "albumThumbUrl": "https://example.com/mock/cover3.jpg",
       "valence": 0.31,
       "arousal": 0.02
     },
@@ -298,11 +301,11 @@ null
     {
       "queueId": "q7",
       "track": {
-        "spotifyId": "7xK2pQ9rT4vW1yZ6bC8dE3",
+        "id": "7xK2pQ9rT4vW1yZ6bC8dE3",
         "title": "Yellow (Acoustic)",
         "artist": "Coldplay",
         "duration": 269000,
-        "albumImageUrl": "https://example.com/mock/cover2.jpg",
+        "albumThumbUrl": "https://example.com/mock/cover2.jpg",
         "valence": 0.05,
         "arousal": -0.05
       },
@@ -324,7 +327,7 @@ null
 
 요청:
 ```json
-{ "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7" }
+{ "id": "0aB1cD2eF3gH4iJ5kL6mN7" }
 ```
 
 성공 `201 Created` (`QueueEntry`):
@@ -332,11 +335,11 @@ null
 {
   "queueId": "q8",
   "track": {
-    "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7",
+    "id": "0aB1cD2eF3gH4iJ5kL6mN7",
     "title": "Don't Know Why",
     "artist": "Norah Jones",
     "duration": 186000,
-    "albumImageUrl": "https://example.com/mock/cover1.jpg",
+    "albumThumbUrl": "https://example.com/mock/cover1.jpg",
     "valence": 0.18,
     "arousal": -0.22
   },
@@ -494,11 +497,11 @@ type TrackRequestEntry = {
       "storeId": "k3m9x2pq",
       "storeName": "제주대학교 공과대학4호관 414호",
       "track": {
-        "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7",
+        "id": "0aB1cD2eF3gH4iJ5kL6mN7",
         "title": "Don't Know Why",
         "artist": "Norah Jones",
         "duration": 186000,
-        "albumImageUrl": "https://example.com/mock/cover1.jpg",
+        "albumThumbUrl": "https://example.com/mock/cover1.jpg",
         "valence": 0.18,
         "arousal": -0.22
       },
@@ -509,11 +512,11 @@ type TrackRequestEntry = {
       "storeId": "k3m9x2pq",
       "storeName": "제주대학교 공과대학4호관 414호",
       "track": {
-        "spotifyId": "7xK2pQ9rT4vW1yZ6bC8dE3",
+        "id": "7xK2pQ9rT4vW1yZ6bC8dE3",
         "title": "Yellow (Acoustic)",
         "artist": "Coldplay",
         "duration": 269000,
-        "albumImageUrl": "https://example.com/mock/cover2.jpg",
+        "albumThumbUrl": "https://example.com/mock/cover2.jpg",
         "valence": 0.05,
         "arousal": -0.05
       },
@@ -595,11 +598,11 @@ type TrackRequestEntry = {
 {
   "tracks": [
     {
-      "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7",
+      "id": "0aB1cD2eF3gH4iJ5kL6mN7",
       "title": "Don't Know Why",
       "artist": "Norah Jones",
       "duration": 186000,
-      "albumImageUrl": "https://example.com/mock/cover1.jpg",
+      "albumThumbUrl": "https://example.com/mock/cover1.jpg",
       "valence": 0.18,
       "arousal": -0.22,
       "requestStatus": "available"
@@ -639,11 +642,11 @@ type TrackRequestEntry = {
 {
   "tracks": [
     {
-      "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7",
+      "id": "0aB1cD2eF3gH4iJ5kL6mN7",
       "title": "Don't Know Why",
       "artist": "Norah Jones",
       "duration": 186000,
-      "albumImageUrl": "https://example.com/mock/cover1.jpg",
+      "albumThumbUrl": "https://example.com/mock/cover1.jpg",
       "valence": 0.18,
       "arousal": -0.22
     }
@@ -664,11 +667,11 @@ type TrackRequestEntry = {
 응답 `200 OK`:
 ```json
 {
-  "spotifyId": "0aB1cD2eF3gH4iJ5kL6mN7",
+  "id": "0aB1cD2eF3gH4iJ5kL6mN7",
   "title": "Don't Know Why",
   "artist": "Norah Jones",
   "duration": 186000,
-  "albumImageUrl": "https://example.com/mock/cover1.jpg",
+  "albumThumbUrl": "https://example.com/mock/cover1.jpg",
   "valence": 0.18,
   "arousal": -0.22
 }
@@ -680,7 +683,7 @@ type TrackRequestEntry = {
 
 요청:
 ```json
-{ "spotifyId": "7xK2pQ9rT4vW1yZ6bC8dE3" }
+{ "id": "7xK2pQ9rT4vW1yZ6bC8dE3" }
 ```
 
 서버는 보고된 곡을 아래 규칙으로 처리하며, 위에서부터 먼저 해당하는 규칙이 적용됩니다.
@@ -703,11 +706,11 @@ type TrackRequestEntry = {
 {
   "nowPlaying": {
     "track": {
-      "spotifyId": "7xK2pQ9rT4vW1yZ6bC8dE3",
+      "id": "7xK2pQ9rT4vW1yZ6bC8dE3",
       "title": "Yellow (Acoustic)",
       "artist": "Coldplay",
       "duration": 269000,
-      "albumImageUrl": "https://example.com/mock/cover2.jpg",
+      "albumThumbUrl": "https://example.com/mock/cover2.jpg",
       "valence": 0.05,
       "arousal": -0.05
     },

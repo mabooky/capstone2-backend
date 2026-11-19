@@ -33,12 +33,12 @@ storeRouter.get('/state', optionalUser, (req, res) => {
 storeRouter.post('/queue', requireUser, async (req, res) => {
     const store = res.locals.store;
     const userId = res.locals.user!.id;
-    const spotifyId = bodyString(req.body, 'spotifyId');
+    const id = bodyString(req.body, 'id');
 
-    const entry = store.enqueue(userId, spotifyId);
+    const entry = store.enqueue(userId, id);
     // 이력은 부가 정보이므로 저장에 실패해도 이미 접수된 신청은 성공으로 응답합니다.
     try {
-        await insertTrackRequest(userId, store.id, spotifyId);
+        await insertTrackRequest(userId, store.id, id);
     } catch (error) {
         console.error('곡 신청 이력을 저장하지 못했습니다.', error);
     }

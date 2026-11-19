@@ -41,7 +41,7 @@ export interface StoreOptions {
 
 /** 카탈로그 곡의 spotifyId를 순서대로 쉼표로 이어 해시합니다. (Spotify ID에는 쉼표가 없어서 서로 다른 목록이 같은 문자열이 될 수 없습니다.) */
 function hashCatalog(catalog: Track[]): string {
-    return murmur3(catalog.map(track => track.spotifyId).join(',')).toString(16).padStart(8, '0');
+    return murmur3(catalog.map(track => track.id).join(',')).toString(16).padStart(8, '0');
 }
 
 /**
@@ -98,7 +98,7 @@ export class Store {
         const result = this.trackLibrary.recommend(request, this.random);
         this.region = request;
         this.catalog = result.tracks;
-        this.catalogIds = new Set(this.catalog.map(track => track.spotifyId));
+        this.catalogIds = new Set(this.catalog.map(track => track.id));
         this.catalogHash = hashCatalog(this.catalog);
         return { ...result, tracks: this.getCatalog() };
     }
@@ -120,10 +120,10 @@ export class Store {
 
     /** 곡의 신청 상태를 정합니다. 여러 상태에 해당하면 아래 순서에서 가장 앞선 하나를 돌려줍니다. */
     statusOf(track: Track): RequestStatus {
-        if (this.nowPlaying?.track.spotifyId === track.spotifyId) return 'now-playing';
-        if (this.queue.some(entry => entry.track.spotifyId === track.spotifyId)) return 'already-queued';
-        if (!this.catalogIds.has(track.spotifyId)) return 'out-of-mood';
-        const startedAt = this.playedAt.get(track.spotifyId);
+        if (this.nowPlaying?.track.id === track.id) return 'now-playing';
+        if (this.queue.some(entry => entry.track.id === track.id)) return 'already-queued';
+        if (!this.catalogIds.has(track.id)) return 'out-of-mood';
+        const startedAt = this.playedAt.get(track.id);
         if (startedAt !== undefined && this.now() - startedAt < this.trackCooldownMs) return 'recently-played';
         return 'available';
     }
@@ -190,11 +190,11 @@ export class Store {
      * 명세의 순서대로 검사하고, 모두 통과했을 때만 마지막에 대기열을 바꿉니다.
      * 검사와 변경 사이에 await가 없으므로 다른 요청이 끼어들 수 없습니다.
      */
-    enqueue(userId: string, spotifyId: string): QueueEntry {
+    enqueue(userId: string, id: string): QueueEntry {
         // ---- 검사 ----
-        const track = this.trackLibrary.get(spotifyId);
+        const track = this.trackLibrary.get(id);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
-        if (!this.catalogIds.has(spotifyId)) {
+        if (!this.catalogIds.has(id)) {
             throw new ApiError(403, 'OUT_OF_MOOD', '현재 카탈로그에 없는 곡입니다.');
         }
         const status = this.statusOf(track);
@@ -202,7 +202,7 @@ export class Store {
             throw new ApiError(409, 'TRACK_ALREADY_QUEUED', '이미 대기열에 있거나 재생 중인 곡입니다.');
         }
         if (status === 'recently-played') {
-            const availableAt = this.playedAt.get(spotifyId)! + this.trackCooldownMs;
+            const availableAt = this.playedAt.get(id)! + this.trackCooldownMs;
             const retryAfterSec = Math.max(1, Math.ceil((availableAt - this.now()) / 1000));
             throw new ApiError(429, 'TRACK_COOLDOWN', '최근에 재생된 곡입니다.', retryAfterSec);
         }
@@ -230,24 +230,24 @@ export class Store {
      * PUT /admin/now-playing: 관리자가 재생하려는 곡을 보고받아 재생 상태를 기록합니다.
      * 명세의 순서대로 검사하고, 모두 통과했을 때만 마지막에 상태를 바꿉니다.
      */
-    reportNowPlaying(spotifyId: string): NowPlayingEntry {
+    reportNowPlaying(id: string): NowPlayingEntry {
         // ---- 검사 ----
-        const track = this.trackLibrary.get(spotifyId);
+        const track = this.trackLibrary.get(id);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
 
         let source: PlaySource;
         let takeFromQueue = false;
-        if (this.nowPlaying?.track.spotifyId === spotifyId) {
+        if (this.nowPlaying?.track.id === id) {
             // 같은 곡을 다시 재생하는 경우입니다. 대기열과 source는 그대로 둡니다.
             source = this.nowPlaying.source;
         } else if (this.queue.length > 0) {
-            if (this.queue[0].track.spotifyId !== spotifyId) {
+            if (this.queue[0].track.id !== id) {
                 throw new ApiError(409, 'NOT_NEXT_IN_QUEUE', '대기열의 맨 앞 곡이 아닙니다.');
             }
             source = 'request';
             takeFromQueue = true;
         } else {
-            if (!this.catalogIds.has(spotifyId)) {
+            if (!this.catalogIds.has(id)) {
                 throw new ApiError(403, 'OUT_OF_MOOD', '현재 카탈로그에 없는 곡입니다.');
             }
             source = 'fallback';
@@ -256,7 +256,7 @@ export class Store {
         // ---- 변경 ----
         if (takeFromQueue) this.queue.shift();
         const startedAt = this.now();
-        this.playedAt.set(spotifyId, startedAt);
+        this.playedAt.set(id, startedAt);
         this.nowPlaying = { track, startedAt, source };
         return this.nowPlaying;
     }
@@ -271,9 +271,9 @@ export class Store {
 
         let oldest: Track | undefined;
         for (const track of this.catalog) {
-            const startedAt = this.playedAt.get(track.spotifyId);
+            const startedAt = this.playedAt.get(track.id);
             if (startedAt === undefined) continue;
-            if (oldest === undefined || startedAt < this.playedAt.get(oldest.spotifyId)!) oldest = track;
+            if (oldest === undefined || startedAt < this.playedAt.get(oldest.id)!) oldest = track;
         }
         if (!oldest) throw new ApiError(409, 'NO_TRACKS', '재생할 수 있는 곡이 없습니다.');
         return oldest;

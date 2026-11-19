@@ -4,10 +4,11 @@ import { recommendCatalog, parseCatalogRequest } from './catalogRecommendation.j
 import { createTrackLibraryFrom } from './trackLibrary.js';
 
 const id = n => String(n).padStart(22, '0');
-const track = (n, x, y) => ({ spotifyId: id(n), valence: x, arousal: y, title: `track ${n}`, artist: 'artist', duration: 1000, albumImageUrl: '' });
+const track = (n, x, y) => ({ id: id(n), valence: x, arousal: y, title: `track ${n}`, artist: 'artist', artistIds: [id(0)], duration: 1000,
+    playCount: 0, albumId: id(0), albumThumbUrl: null });
 const seeds = (n = 100) => ({ mode: 'seeds', spotifyIds: [id(1), id(2), id(3)], n });
 const range = (n = 100) => ({ mode: 'range', valenceMin: -1, valenceMax: 1, energyMin: -1, energyMax: 1, n });
-const ids = result => result.tracks.map(t => t.spotifyId).sort();
+const ids = result => result.tracks.map(t => t.id).sort();
 
 test('convex hull includes interior, edges, circular buffer and rounded vertices; excludes outside', () => {
     const library = [track(1, 0, 0), track(2, .5, 0), track(3, 0, .5), track(4, .1, .1),
@@ -38,9 +39,9 @@ test('invalid coordinates and out-of-space songs are excluded, IDs deduplicated'
     const library = [track(1, 0, 0),track(1, 0, 0),track(2, NaN, 0),track(3, 0, Infinity),
         track(4, 1.01, 0),track(5, 0, -1.01),track(6, null, 0),track(7, 0, 0)];
     // Validation/deduplication now happens once at the library initialization boundary.
-    const prepared = createTrackLibraryFrom(library.map(t => ({spotify_id:t.spotifyId, title:t.title,
-        artist:t.artist, duration_ms:t.duration, valence:t.valence === null ? null : (t.valence + 1) / 2,
-        energy:(t.arousal + 1) / 2})));
+    const prepared = createTrackLibraryFrom(library.map(t => ({spotify_id:t.id, title:t.title,
+        artist:t.artist, artist_spotify_ids:t.artistIds, duration_ms:t.duration, play_count:String(t.playCount),
+        album_id:t.albumId, album_thumb_url:t.albumThumbUrl, valence:t.valence, arousal:t.arousal})));
     const result = prepared.recommend(range());
     assert.deepEqual(ids(result), [id(1),id(7)]);
     assert.equal(result.candidateCount, 2);
@@ -52,7 +53,7 @@ test('all seeds mandatory before sampling, full output shuffled, inputs untouche
     const result = recommendCatalog(library, seeds(5), () => 0);
     for (const key of [id(1),id(2),id(3)]) assert.ok(ids(result).includes(key));
     assert.equal(new Set(ids(result)).size, 5);
-    assert.notEqual(result.tracks[0].spotifyId, id(1));
+    assert.notEqual(result.tracks[0].id, id(1));
     assert.equal(result.status, 'complete');
     assert.deepEqual(library, snapshot);
 });
@@ -76,7 +77,7 @@ test('exhaustive Fisher-Yates branches give each ordered pair equal multiplicity
     const counts = new Map();
     for (let a=0;a<3;a++) for (let b=0;b<2;b++) for(let c=0;c<2;c++) {
         const stream = [(a+.5)/3,(b+.5)/2,(c+.5)/2];
-        const key = recommendCatalog(library, range(2), () => stream.shift()).tracks.map(t=>t.spotifyId).join(',');
+        const key = recommendCatalog(library, range(2), () => stream.shift()).tracks.map(t=>t.id).join(',');
         counts.set(key,(counts.get(key)??0)+1);
     }
     assert.equal(counts.size,6);
@@ -88,7 +89,7 @@ test('remaining candidates uniformly sampled with seeds fixed as a set', () => {
     for(let a=0;a<3;a++) for(let b=0;b<2;b++) {
         const stream = [(a+.5)/3,(b+.5)/2];
         const result = recommendCatalog(library,seeds(4),()=>stream.shift()??.5);
-        const selected = result.tracks.find(t=>Number(t.spotifyId)>3).spotifyId;
+        const selected = result.tracks.find(t=>Number(t.id)>3).id;
         counts.set(selected,(counts.get(selected)??0)+1);
     }
     assert.deepEqual([...counts.values()], [2,2,2]);
@@ -98,8 +99,8 @@ test('buffered square grid agrees with independent distance-to-box oracle', () =
     for(let x=-10;x<=10;x++) for(let y=-10;y<=10;y++) {
         const p=track(5,x/10,y/10);
         const expected=Math.hypot(Math.max(Math.abs(p.valence)-.3,0),Math.max(Math.abs(p.arousal)-.3,0))<=.1+1e-12;
-        const result=recommendCatalog([...corners,p],{mode:'seeds',spotifyIds:corners.map(t=>t.spotifyId),n:5});
-        assert.equal(result.tracks.some(t=>t.spotifyId===id(5)),expected,`${x},${y}`);
+        const result=recommendCatalog([...corners,p],{mode:'seeds',spotifyIds:corners.map(t=>t.id),n:5});
+        assert.equal(result.tracks.some(t=>t.id===id(5)),expected,`${x},${y}`);
     }
 });
 test('diagonal capsule uses perpendicular distance and clipped domain', () => {

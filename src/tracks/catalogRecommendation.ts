@@ -94,7 +94,7 @@ function shuffle<T>(values: T[], random: () => number): T[] {
 export function recommendCatalog(library: readonly Track[], input: CatalogRequest, random: () => number = Math.random): CatalogResult {
     const request = parseCatalogRequest(input);
     const seeds: Track[] = request.mode === 'seeds' ? request.spotifyIds.map(id => {
-        const track = library.find(track => track.spotifyId === id);
+        const track = library.find(track => track.id === id);
         if (!track || !hasValidCoordinates(track)) throw new CatalogRequestError('기준곡이 없거나 유효한 감정 좌표가 없습니다.');
         return track;
     }) : [];
@@ -103,8 +103,8 @@ export function recommendCatalog(library: readonly Track[], input: CatalogReques
         ? p.valence >= request.valenceMin - EPS && p.valence <= request.valenceMax + EPS &&
           p.arousal >= request.energyMin - EPS && p.arousal <= request.energyMax + EPS
         : inBufferedHull(p, polygon));
-    const seedIds = new Set(seeds.map(t => t.spotifyId));
-    const others = shuffle(candidates.filter(t => !seedIds.has(t.spotifyId)), random).slice(0, request.n - seeds.length);
+    const seedIds = new Set(seeds.map(t => t.id));
+    const others = shuffle(candidates.filter(t => !seedIds.has(t.id)), random).slice(0, request.n - seeds.length);
     const tracks = shuffle([...seeds, ...others], random);
     return { tracks, candidateCount: candidates.length,
         status: tracks.length === 0 ? 'empty' : tracks.length < request.n ? 'insufficient-candidates' : 'complete' };

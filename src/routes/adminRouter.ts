@@ -32,7 +32,7 @@ adminRouter.get('/fallback-track', (req, res) => {
 });
 
 adminRouter.put('/now-playing', (req, res) => {
-    res.json({ nowPlaying: res.locals.store.reportNowPlaying(bodyString(req.body, 'spotifyId')) });
+    res.json({ nowPlaying: res.locals.store.reportNowPlaying(bodyString(req.body, 'id')) });
 });
 
 adminRouter.delete('/queue/:queueId', (req, res) => {

@@ -22,7 +22,7 @@ test('tracks_v3 row mapping normalizes model A exactly once, never converts miss
     assert.equal(library.get(id(1)).arousal,1);
     assert.equal(library.get(id(2)).valence,0);
     const result = library.recommend({...range,valenceMin:-1,valenceMax:1,energyMin:-1,energyMax:1});
-    assert.deepEqual(result.tracks.map(t=>t.spotifyId).sort(),[1,2,6].map(id));
+    assert.deepEqual(result.tracks.map(t=>t.id).sort(),[1,2,6].map(id));
     assert.equal(library.get(id(6)).valence,.5);
     assert.equal(source[0].valence,0);
 });
@@ -45,7 +45,7 @@ test('Store catalog update preserves queue, playback, cooldown, admin token; fai
     assert.ok(store.isAdminToken(token));
     assert.equal(store.reportNowPlaying(id(2)).source,'request');
     store.setRegionCatalog(range);
-    assert.equal(store.getCatalog().find(t=>t.spotifyId===id(1)).requestStatus,'recently-played');
+    assert.equal(store.getCatalog().find(t=>t.id===id(1)).requestStatus,'recently-played');
     const beforeFailure = store.getState();
     assert.throws(()=>store.setRegionCatalog({...seedRequest,spotifyIds:[id(1),id(2),id(99)]}));
     assert.deepEqual(store.getState(),beforeFailure);
@@ -97,7 +97,7 @@ test('real production routers: login, catalog, request, state, playback, isolati
     assert.equal(generated.body.tracks.length,4);
     assert.equal(generated.body.candidateCount,4);
     assert.ok(generated.body.tracks.every(t=>t.requestStatus==='available'));
-    for(const key of seedRequest.spotifyIds) assert.ok(generated.body.tracks.some(t=>t.spotifyId===key));
+    for(const key of seedRequest.spotifyIds) assert.ok(generated.body.tracks.some(t=>t.id===key));
     assert.deepEqual((await request('one/mood')).body,seedRequest);
     const catalog = await request('one/catalog');
     assert.equal(catalog.body.length,4);
@@ -109,7 +109,7 @@ test('real production routers: login, catalog, request, state, playback, isolati
     assert.throws(()=>store.enqueue('b',id(1)),error=>error.status===409);
     assert.equal(store.getMe('a').canRequest,false);
     assert.equal(store.getState('a').queue[0].mine,true);
-    assert.equal((await request('one/admin/now-playing','PUT',{spotifyId:id(1)},token)).body.nowPlaying.source,'request');
+    assert.equal((await request('one/admin/now-playing','PUT',{id:id(1)},token)).body.nowPlaying.source,'request');
     assert.equal(store.getMe('a').canRequest,true);
     store.enqueue('b',id(2));
     const before=(await request('one/state')).body;
