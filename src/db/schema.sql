@@ -30,6 +30,40 @@ CREATE TABLE IF NOT EXISTS tracks_v3 (
 
 CREATE INDEX IF NOT EXISTS tracks_v3_artists_idx ON tracks_v3 USING gin (artist_reccobeats_ids);
 
+-- 아래 albums_v4, tracks_v4는 capstone2-data 저장소의 v4/ 스크립트로 올린 새 곡 데이터이며, tracks_v3와는 별개입니다.
+
+-- 앨범. tracks_v4의 곡이 속한 앨범입니다. 커버 이미지는 가로 640, 300, 64픽셀 크기별 URL이며, 해당 크기가 없으면 NULL입니다.
+CREATE TABLE IF NOT EXISTS albums_v4 (
+    spotify_id text PRIMARY KEY CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
+    name text NOT NULL CHECK (btrim(name) <> ''),
+    type text NOT NULL CHECK (type IN ('album', 'single', 'ep', 'compilation')),
+    artist text NOT NULL CHECK (btrim(artist) <> ''), -- 앨범 아티스트 이름을 ', '로 이은 표시용 문자열
+    artist_spotify_ids text[] NOT NULL CHECK (cardinality(artist_spotify_ids) > 0), -- artist와 같은 순서
+    release_date date,
+    cover_url_640 text,
+    cover_url_300 text,
+    cover_url_64 text
+);
+
+-- 곡. 서비스에서 추천하고 재생하는 단위입니다.
+-- valence, arousal은 [-1, 1] 범위로 정규화한 값이며, 값이 없는 곡은 저장하지 않습니다.
+CREATE TABLE IF NOT EXISTS tracks_v4 (
+    spotify_id text PRIMARY KEY CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
+    reccobeats_id uuid, -- ReccoBeats의 곡 ID. 오디오를 올려서 값을 얻은 곡은 없을 수 있습니다.
+    title text NOT NULL CHECK (btrim(title) <> ''),
+    artist text NOT NULL CHECK (btrim(artist) <> ''), -- 참여 아티스트 이름을 ', '로 이은 표시용 문자열
+    artist_spotify_ids text[] NOT NULL CHECK (cardinality(artist_spotify_ids) > 0), -- artist와 같은 순서
+    duration_ms integer NOT NULL CHECK (duration_ms >= 0),
+    play_count bigint NOT NULL DEFAULT 0 CHECK (play_count >= 0), -- Spotify 누적 재생 수. 값이 없는 곡은 0입니다.
+    album_id text NOT NULL REFERENCES albums_v4 (spotify_id),
+    album_thumb_url text, -- 목록 화면용 64픽셀 앨범 커버. 조회할 때 앨범 테이블을 조인하지 않도록 곡에 둡니다.
+    valence double precision NOT NULL CHECK (valence BETWEEN -1 AND 1),
+    arousal double precision NOT NULL CHECK (arousal BETWEEN -1 AND 1)
+);
+
+CREATE INDEX IF NOT EXISTS tracks_v4_artist_spotify_ids_idx ON tracks_v4 USING gin (artist_spotify_ids);
+CREATE INDEX IF NOT EXISTS tracks_v4_album_id_idx ON tracks_v4 (album_id);
+
 -- 매장. id는 서버가 무작위로 생성하며 고객에게 노출되는 매장 주소에 쓰입니다.
 CREATE TABLE IF NOT EXISTS stores (
     id text PRIMARY KEY CHECK (char_length(id) = 8),
