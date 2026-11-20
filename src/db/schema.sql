@@ -107,12 +107,12 @@ CREATE TABLE IF NOT EXISTS track_requests (
 
 CREATE INDEX IF NOT EXISTS track_requests_user_idx ON track_requests (user_id, requested_at DESC);
 
--- 고객의 곡 평가. 고객이 매장에서 재생된 곡에 남긴 추천(+1)과 비추천(-1)이며, 취소하면 행을 삭제합니다.
+-- 고객의 곡 평가. 고객이 매장에서 재생된 곡에 남긴 추천(+1)과 비추천(-1)이며, 취소 시에는 행을 삭제하지 않고 0으로 바꿔 평가한 적이 있음을 남깁니다.
 CREATE TABLE IF NOT EXISTS track_ratings (
     store_id text NOT NULL REFERENCES stores (id),
     user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     track_spotify_id text NOT NULL CHECK (track_spotify_id ~ '^[0-9A-Za-z]{22}$'),
-    rating smallint NOT NULL CHECK (rating IN (-1, 0, 1)), -- 1=추천, -1=비추천, 취소 시에는 행을 삭제하지 않고 0으로 바꿔 평가한 적이 있음을 남깁니다.
+    rating smallint NOT NULL CHECK (rating IN (-1, 0, 1)),
     rated_at timestamptz NOT NULL DEFAULT now(), -- 현재 평가를 남긴 시각. 평가를 바꿀 때마다 갱신합니다.
     PRIMARY KEY (store_id, user_id, track_spotify_id)
 );
