@@ -1,4 +1,4 @@
-import type { ErrorRequestHandler, Request, RequestHandler } from 'express';
+import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
 import { ApiError } from './errors.js';
 import { CatalogRequestError } from './tracks/catalogRequestError.js';
 import type { Store } from './store.js';
@@ -65,7 +65,7 @@ export const requireAdmin: RequestHandler = (req, res, next) => {
 };
 
 /** Authorization: Bearer 토큰으로 로그인한 사용자를 찾습니다. 토큰이 없거나 세션이 없거나 만료되었으면 null입니다. */
-async function findSessionUser(req: Request): Promise<{ user: UserRow; sessionHash: Buffer } | null> {
+async function findSessionUser<P>(req: Request<P>): Promise<{ user: UserRow; sessionHash: Buffer } | null> {
     const token = /^Bearer (.+)$/i.exec(req.get('Authorization') ?? '')?.[1];
     if (token === undefined) return null;
 
@@ -77,8 +77,9 @@ async function findSessionUser(req: Request): Promise<{ user: UserRow; sessionHa
 /**
  * 로그인한 사용자를 확인해 res.locals.user와 res.locals.sessionHash에 담습니다.
  * 로그인하지 않았거나 세션이 만료되었으면 401 CUSTOMER_UNAUTHORIZED를 반환합니다.
+ * 경로 파라미터를 쓰지 않으므로 P를 제네릭으로 두어, 이 미들웨어가 뒤따르는 핸들러의 req.params 타입을 string | string[]로 고정하지 않게 합니다.
  */
-export const requireUser: RequestHandler = async (req, res, next) => {
+export const requireUser = async <P>(req: Request<P>, res: Response, next: NextFunction): Promise<void> => {
     const session = await findSessionUser(req);
     if (session === null) {
         throw new ApiError(401, 'CUSTOMER_UNAUTHORIZED', '로그인이 필요합니다.');
@@ -93,7 +94,7 @@ export const requireUser: RequestHandler = async (req, res, next) => {
  * 로그인한 사용자가 있으면 requireUser처럼 res.locals에 담고, 없거나 세션이 만료되었으면 오류 없이 넘어갑니다.
  * 로그인하지 않아도 쓸 수 있지만 로그인 여부에 따라 응답이 달라지는 엔드포인트에 사용합니다.
  */
-export const optionalUser: RequestHandler = async (req, res, next) => {
+export const optionalUser = async <P>(req: Request<P>, res: Response, next: NextFunction): Promise<void> => {
     const session = await findSessionUser(req);
     if (session !== null) {
         res.locals.user = session.user;
