@@ -12,6 +12,7 @@ export type ErrorCode =
     | 'TRACK_ALREADY_QUEUED'
     | 'MY_REQUEST_PENDING'
     | 'NOT_NEXT_IN_QUEUE'
+    | 'NOT_NOW_PLAYING'
     | 'NO_TRACKS'
     | 'TRACK_COOLDOWN';
 

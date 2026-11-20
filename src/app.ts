@@ -1,20 +1,22 @@
 import express from 'express';
 import cors from 'cors';
 import type { TrackLibrary } from './tracks/trackLibrary.js';
+import type { TrackRatings } from './tracks/trackRatings.js';
 import { loadTrackLibrary } from './tracks/loadTrackLibrary.js';
+import { loadTrackRatings } from './tracks/loadTrackRatings.js';
 import { errorHandler, resolveStore } from './middleware.js';
 import { authRouter } from './routes/authRouter.js';
 import { createMeRouter } from './routes/meRouter.js';
-import { storeRouter } from './routes/storeRouter.js';
+import { createStoreRouter } from './routes/storeRouter.js';
 import { findAllStores } from './db/storeRepository.js';
 import { Store } from './store.js';
 
 /**
- * 등록된 매장마다 Store 객체를 만듭니다. 모든 매장이 같은 trackLibrary를 공유하며,
+ * 등록된 매장마다 Store 객체를 만듭니다. 모든 매장이 같은 trackLibrary와 trackRatings를 공유하며,
  * 곡 쿨타임은 TRACK_COOLDOWN_MIN 환경변수(분)로 정합니다. 설정이 없으면 30분입니다.
  * 시작할 때 한 번만 만들므로 매장을 추가하면 서버를 재시작해야 합니다. 등록된 매장이 없으면 오류를 던집니다.
  */
-async function createStores(trackLibrary: TrackLibrary): Promise<Store[]> {
+async function createStores(trackLibrary: TrackLibrary, trackRatings: TrackRatings): Promise<Store[]> {
     // 환경변수에서 설정한 곡 쿨타임을 불러와 Store 객체에 주입
     const cooldownMin = Number(process.env.TRACK_COOLDOWN_MIN ?? 30);
     if (!Number.isFinite(cooldownMin) || cooldownMin < 0) {
@@ -25,7 +27,7 @@ async function createStores(trackLibrary: TrackLibrary): Promise<Store[]> {
     if (storeRows.length === 0) {
         throw new Error('등록된 매장이 없습니다. node --env-file=.env scripts/stores.mjs add <이름> --yes 로 매장을 등록해 주십시오.');
     }
-    return storeRows.map(row => new Store(trackLibrary, {
+    return storeRows.map(row => new Store(trackLibrary, trackRatings, {
         id: row.id,
         name: row.name,
         adminPasswordHash: row.admin_password_hash,
@@ -36,7 +38,8 @@ async function createStores(trackLibrary: TrackLibrary): Promise<Store[]> {
 export async function createApp() {
     const globalTrackLibrary = await loadTrackLibrary();
     console.log(`곡 ${globalTrackLibrary.size}개를 불러왔습니다.`);
-    const stores = await createStores(globalTrackLibrary);
+    const globalTrackRatings = await loadTrackRatings();
+    const stores = await createStores(globalTrackLibrary, globalTrackRatings);
 
     const app = express();
     app.use(cors());
@@ -48,7 +51,7 @@ export async function createApp() {
 
     app.use('/api/auth', authRouter);
     app.use('/api/me', createMeRouter(globalTrackLibrary));
-    app.use('/api/stores/:storeId', resolveStore(stores), storeRouter);
+    app.use('/api/stores/:storeId', resolveStore(stores), createStoreRouter(globalTrackLibrary, globalTrackRatings));
 
     app.use(errorHandler);
 

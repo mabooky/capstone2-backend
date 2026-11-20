@@ -26,6 +26,13 @@ export function bodyString(body: unknown, key: string): string {
     return value;
 }
 
+/** 요청 본문에서 곡 평가 값을 읽습니다. 추천은 1, 비추천은 -1이며, 그 밖의 값(취소를 뜻하는 0 포함)은 오류입니다. */
+export function bodyRating(body: unknown, key: string): 1 | -1 {
+    const value = (body as Record<string, unknown> | undefined)?.[key];
+    if (value !== 1 && value !== -1) throw invalid(`${key}는 1 또는 -1이어야 합니다.`);
+    return value;
+}
+
 /** 요청 본문에서 숫자 항목을 읽습니다. 없으면 undefined이고, 숫자가 아니면 오류입니다. */
 export function bodyNumber(body: unknown, key: string): number | undefined {
     const value = (body as Record<string, unknown> | undefined)?.[key];

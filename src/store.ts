@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ApiError } from './errors.js';
 import { murmur3 } from './murmur3.js';
 import type { TrackLibrary } from './tracks/trackLibrary.js';
+import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
 import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './tracks/catalogRecommendation.js';
@@ -75,7 +76,7 @@ export class Store {
     /** 현재 유효한 관리자 토큰입니다. 매장당 하나만 유지하므로 새로 로그인하면 이전 토큰은 무효가 됩니다. */
     private adminToken: string | null = null;
 
-    constructor(private readonly trackLibrary: TrackLibrary, options: StoreOptions) {
+    constructor(private readonly trackLibrary: TrackLibrary, private readonly trackRatings: TrackRatings, options: StoreOptions) {
         this.id = options.id;
         this.name = options.name;
         this.adminPasswordHash = options.adminPasswordHash;
@@ -131,19 +132,25 @@ export class Store {
         return 'available';
     }
 
-    /** 곡에 신청 상태와 평가를 붙여 응답용 곡으로 만듭니다. 평가를 읽는 부분이 아직 없으므로 myRating은 항상 null입니다. */
-    private withContext(track: Track): TrackWithContext {
-        return { ...track, requestStatus: this.statusOf(track), myRating: null };
+    /** 곡에 신청 상태와 userId 사용자의 평가를 붙여 응답용 곡으로 만듭니다. userId가 없으면(로그인하지 않았거나 관리자 응답) myRating은 null입니다. */
+    private withContext(track: Track, userId?: string): TrackWithContext {
+        const rating = userId === undefined ? undefined : this.trackRatings.get(this.id, userId, track.id);
+        return { ...track, requestStatus: this.statusOf(track), myRating: rating ?? null };
     }
 
     /** 저장된 재생 중인 곡을 응답용으로 바꿉니다. */
-    private toNowPlayingEntry(entry: NowPlayingEntryServer): NowPlayingEntry {
-        return { track: this.withContext(entry.track), startedAt: entry.startedAt, source: entry.source };
+    private toNowPlayingEntry(entry: NowPlayingEntryServer, userId?: string): NowPlayingEntry {
+        return { track: this.withContext(entry.track, userId), startedAt: entry.startedAt, source: entry.source };
+    }
+
+    /** 이 곡이 지금 재생 중인지 확인합니다. */
+    isNowPlaying(id: string): boolean {
+        return this.nowPlaying?.track.id === id;
     }
 
     /** GET /catalog: preserves the sampled order, adding only request status. */
-    getCatalog(): TrackWithContext[] {
-        return this.catalog.map(track => this.withContext(track));
+    getCatalog(userId?: string): TrackWithContext[] {
+        return this.catalog.map(track => this.withContext(track, userId));
     }
 
     /** GET /state: 재생 중인 곡과 대기열 전체입니다. userId가 신청한 곡에는 mine이 true입니다. */
@@ -151,10 +158,10 @@ export class Store {
         return {
             serverTime: this.now(),
             catalogHash: this.catalogHash,
-            nowPlaying: this.nowPlaying && this.toNowPlayingEntry(this.nowPlaying),
+            nowPlaying: this.nowPlaying && this.toNowPlayingEntry(this.nowPlaying, userId),
             queue: this.queue.map(entry => ({
                 queueId: entry.queueId,
-                track: this.withContext(entry.track),
+                track: this.withContext(entry.track, userId),
                 requestedAt: entry.requestedAt,
                 mine: userId !== undefined && entry.userId === userId,
             })),
@@ -162,7 +169,7 @@ export class Store {
     }
 
     /** GET /search: 전체 곡에서 검색하고, 카탈로그 밖의 곡에는 out-of-mood 상태가 붙습니다. */
-    search(query: string, limit: number = 20, offset: number = 0): { total: number; tracks: TrackWithContext[] } {
+    search(query: string, limit: number = 20, offset: number = 0, userId?: string): { total: number; tracks: TrackWithContext[] } {
         if (query.trim() === '') {
             throw new ApiError(400, 'INVALID_INPUT', 'q는 비어 있을 수 없습니다.');
         }
@@ -173,7 +180,7 @@ export class Store {
             throw new ApiError(400, 'INVALID_INPUT', 'offset은 0 이상의 정수여야 합니다.');
         }
         const { total, tracks } = this.trackLibrary.search(query, limit, offset);
-        return { total, tracks: tracks.map(track => this.withContext(track)) };
+        return { total, tracks: tracks.map(track => this.withContext(track, userId)) };
     }
 
     /** 이 사용자가 신청한 곡이 대기열에 있는지 확인합니다. 재생 중인 곡은 대기 중으로 보지 않습니다. */
@@ -224,7 +231,7 @@ export class Store {
         this.queue.push(entry);
         return {
             queueId: entry.queueId,
-            track: this.withContext(track),
+            track: this.withContext(track, userId),
             requestedAt: entry.requestedAt,
             mine: true,
         };
