@@ -3,7 +3,7 @@ import { ApiError } from './errors.js';
 import { murmur3 } from './murmur3.js';
 import type { TrackLibrary } from './tracks/trackLibrary.js';
 import type { Track } from './tracks/track.js';
-import type { RequestStatus, TrackWithStatus } from './models/trackWithStatus.js';
+import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
 import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './tracks/catalogRecommendation.js';
 
 type PlaySource = 'request' | 'fallback';
@@ -12,10 +12,13 @@ type PlaySource = 'request' | 'fallback';
 type QueueEntryServer = { queueId: string; track: Track; requestedAt: number; userId: string };
 
 /** 응답으로 나가는 대기열의 한 곡입니다. API 명세의 QueueEntry에 해당합니다. */
-export type QueueEntry = { queueId: string; track: Track; requestedAt: number; mine: boolean };
+export type QueueEntry = { queueId: string; track: TrackWithContext; requestedAt: number; mine: boolean };
 
-/** 재생 중인 곡입니다. 저장 모양과 응답 모양이 같습니다. */
-export type NowPlayingEntry = { track: Track; startedAt: number; source: PlaySource };
+/** 서버가 저장하는 재생 중인 곡입니다. 곡은 Track으로 저장하고, 응답을 만들 때 맥락을 붙입니다. */
+type NowPlayingEntryServer = { track: Track; startedAt: number; source: PlaySource };
+
+/** 응답으로 나가는 재생 중인 곡입니다. API 명세의 NowPlayingEntry에 해당합니다. */
+export type NowPlayingEntry = { track: TrackWithContext; startedAt: number; source: PlaySource };
 
 /** GET /state 응답의 모양입니다. */
 export type StoreState = {
@@ -64,7 +67,7 @@ export class Store {
     /** 카탈로그의 곡 목록(순서 포함)에서 계산한 8자리 16진수 해시입니다. 목록이 같으면 같은 값입니다. */
     private catalogHash: string = hashCatalog([]);
     private queue: QueueEntryServer[] = [];
-    private nowPlaying: NowPlayingEntry | null = null;
+    private nowPlaying: NowPlayingEntryServer | null = null;
     /** 곡별로 마지막에 재생이 시작된 시각입니다. */
     private readonly playedAt = new Map<string, number>();
     /** 다음에 만들 대기열 항목의 번호입니다. queueId는 q1, q2, ...로 매장 안에서 올라갑니다. */
@@ -93,7 +96,7 @@ export class Store {
     }
 
     /** Validate and sample before committing any state; queue, playback and cooldowns are retained. */
-    setRegionCatalog(input: CatalogRequest): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithStatus[] } {
+    setRegionCatalog(input: CatalogRequest): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
         const request = parseCatalogRequest(input);
         const result = this.trackLibrary.recommend(request, this.random);
         this.region = request;
@@ -128,14 +131,19 @@ export class Store {
         return 'available';
     }
 
-    /** 곡에 상태 정보를 붙여 반환합니다. */
-    private withStatus(track: Track): TrackWithStatus {
-        return { ...track, requestStatus: this.statusOf(track) };
+    /** 곡에 신청 상태와 평가를 붙여 응답용 곡으로 만듭니다. 평가를 읽는 부분이 아직 없으므로 myRating은 항상 null입니다. */
+    private withContext(track: Track): TrackWithContext {
+        return { ...track, requestStatus: this.statusOf(track), myRating: null };
+    }
+
+    /** 저장된 재생 중인 곡을 응답용으로 바꿉니다. */
+    private toNowPlayingEntry(entry: NowPlayingEntryServer): NowPlayingEntry {
+        return { track: this.withContext(entry.track), startedAt: entry.startedAt, source: entry.source };
     }
 
     /** GET /catalog: preserves the sampled order, adding only request status. */
-    getCatalog(): TrackWithStatus[] {
-        return this.catalog.map(track => this.withStatus(track));
+    getCatalog(): TrackWithContext[] {
+        return this.catalog.map(track => this.withContext(track));
     }
 
     /** GET /state: 재생 중인 곡과 대기열 전체입니다. userId가 신청한 곡에는 mine이 true입니다. */
@@ -143,14 +151,10 @@ export class Store {
         return {
             serverTime: this.now(),
             catalogHash: this.catalogHash,
-            nowPlaying: this.nowPlaying && {
-                track: this.nowPlaying.track,
-                startedAt: this.nowPlaying.startedAt,
-                source: this.nowPlaying.source,
-            },
+            nowPlaying: this.nowPlaying && this.toNowPlayingEntry(this.nowPlaying),
             queue: this.queue.map(entry => ({
                 queueId: entry.queueId,
-                track: entry.track,
+                track: this.withContext(entry.track),
                 requestedAt: entry.requestedAt,
                 mine: userId !== undefined && entry.userId === userId,
             })),
@@ -158,7 +162,7 @@ export class Store {
     }
 
     /** GET /search: 전체 곡에서 검색하고, 카탈로그 밖의 곡에는 out-of-mood 상태가 붙습니다. */
-    search(query: string, limit: number = 20, offset: number = 0): { total: number; tracks: TrackWithStatus[] } {
+    search(query: string, limit: number = 20, offset: number = 0): { total: number; tracks: TrackWithContext[] } {
         if (query.trim() === '') {
             throw new ApiError(400, 'INVALID_INPUT', 'q는 비어 있을 수 없습니다.');
         }
@@ -169,7 +173,7 @@ export class Store {
             throw new ApiError(400, 'INVALID_INPUT', 'offset은 0 이상의 정수여야 합니다.');
         }
         const { total, tracks } = this.trackLibrary.search(query, limit, offset);
-        return { total, tracks: tracks.map(track => this.withStatus(track)) };
+        return { total, tracks: tracks.map(track => this.withContext(track)) };
     }
 
     /** 이 사용자가 신청한 곡이 대기열에 있는지 확인합니다. 재생 중인 곡은 대기 중으로 보지 않습니다. */
@@ -220,7 +224,7 @@ export class Store {
         this.queue.push(entry);
         return {
             queueId: entry.queueId,
-            track,
+            track: this.withContext(track),
             requestedAt: entry.requestedAt,
             mine: true,
         };
@@ -258,16 +262,16 @@ export class Store {
         const startedAt = this.now();
         this.playedAt.set(id, startedAt);
         this.nowPlaying = { track, startedAt, source };
-        return this.nowPlaying;
+        return this.toNowPlayingEntry(this.nowPlaying);
     }
 
     /**
      * GET /admin/fallback-track: 대기열이 비었을 때 자동으로 재생할 곡을 고릅니다. 상태는 바꾸지 않습니다.
      * 지금 신청할 수 있는 곡 중에서 무작위로 고르고, 없으면 카탈로그에서 가장 오래전에 재생된 곡을 돌려줍니다.
      */
-    getFallbackTrack(): Track {
+    getFallbackTrack(): TrackWithContext {
         const available = this.catalog.filter(track => this.statusOf(track) === 'available');
-        if (available.length > 0) return available[Math.floor(this.random() * available.length)];
+        if (available.length > 0) return this.withContext(available[Math.floor(this.random() * available.length)]);
 
         let oldest: Track | undefined;
         for (const track of this.catalog) {
@@ -276,6 +280,6 @@ export class Store {
             if (oldest === undefined || startedAt < this.playedAt.get(oldest.id)!) oldest = track;
         }
         if (!oldest) throw new ApiError(409, 'NO_TRACKS', '재생할 수 있는 곡이 없습니다.');
-        return oldest;
+        return this.withContext(oldest);
     }
 }
