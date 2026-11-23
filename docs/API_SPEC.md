@@ -44,6 +44,29 @@ type Track = {
   arousal: number;         // [-1, 1] 이름은 arousal이지만 값은 Energy입니다.
 };
 
+type Album = {
+  id: string;              // Spotify 앨범 ID (22자). 앨범의 유일한 식별자이며 Track.albumId의 값과 같습니다.
+  name: string;
+  type: 'album' | 'single' | 'ep' | 'compilation';
+  artist: string;          // 앨범 아티스트 이름을 ', '로 이은 표시용 문자열
+  artistIds: string[];     // Spotify 아티스트 ID. artist와 같은 순서
+  releaseDate: string;     // 발매일 'YYYY-MM-DD'
+  coverUrl640: string;     // 가로 640픽셀 앨범 커버
+  coverUrl300: string;     // 가로 300픽셀 앨범 커버
+  coverUrl64: string;      // 가로 64픽셀 앨범 커버. Track.albumThumbUrl과 같은 이미지입니다.
+};
+
+type Artist = {
+  id: string;                      // Spotify 아티스트 ID (22자). 아티스트의 유일한 식별자이며 Track.artistIds의 값과 같습니다.
+  name: string;
+  // 프로필 사진입니다. 세 크기가 모두 없거나 640픽셀만 있는 아티스트가 있으며, 640픽셀만 있을 때 그 이미지는 앨범 커버일 수 있습니다.
+  // 필요한 크기가 없으면 다른 크기를 대신 사용하고, 모두 없으면 기본 이미지를 표시해 주십시오.
+  imageUrl640: string | null;      // 가로 640픽셀. 없으면 null
+  imageUrl320: string | null;      // 가로 320픽셀. 없으면 null
+  imageUrl160: string | null;      // 가로 160픽셀. 없으면 null
+  monthlyListeners: number | null; // Spotify 월간 청취자 수. 값이 없으면 null
+};
+
 // 매장 응답에 포함되는 곡입니다. 곡 자체(Track)에 매장과 사용자라는 맥락에서 정해지는 값을 붙인 것입니다.
 type TrackWithContext = Track & {
   requestStatus: RequestStatus;   // 이 매장에서의 신청 상태
