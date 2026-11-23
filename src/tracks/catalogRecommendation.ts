@@ -1,10 +1,14 @@
+import { murmur3 } from '../murmur3.js';
 import { CatalogRequestError } from './catalogRequestError.js';
 import type { Track } from './track.js';
 
-/** Product model A only. Track.arousal is normalized ReccoBeats Energy. */
+/**
+ * Product model A only. Track.arousal is normalized ReccoBeats Energy.
+ * randomSeed는 클라이언트가 정하는 0 이상 2^32 미만의 정수이며, 같은 요청은 항상 같은 카탈로그를 만듭니다.
+ */
 export type CatalogRequest =
-    | { mode: 'seeds'; spotifyIds: string[]; n: number }
-    | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number };
+    | { mode: 'seeds'; spotifyIds: string[]; n: number; randomSeed: number }
+    | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };
 export type CatalogResult = {
     tracks: Track[];
     status: 'complete' | 'insufficient-candidates' | 'empty';
@@ -28,23 +32,26 @@ export function parseCatalogRequest(value: unknown): CatalogRequest {
     const r = value as Record<string, unknown>;
     if (!Number.isInteger(r.n) || (r.n as number) < 1 || (r.n as number) > 100) invalid('n은 1~100 정수여야 합니다.');
     const n = r.n as number;
+    if (!Number.isInteger(r.randomSeed) || (r.randomSeed as number) < 0 || (r.randomSeed as number) >= 2 ** 32)
+        invalid('randomSeed는 0 이상 2^32 미만의 정수여야 합니다.');
+    const randomSeed = r.randomSeed as number;
     if (r.mode === 'seeds') {
-        if (Object.keys(r).some(key => !['mode', 'spotifyIds', 'n'].includes(key))) invalid('지원하지 않는 영역 입력 필드입니다.');
+        if (Object.keys(r).some(key => !['mode', 'spotifyIds', 'n', 'randomSeed'].includes(key))) invalid('지원하지 않는 영역 입력 필드입니다.');
         if (!Array.isArray(r.spotifyIds) || r.spotifyIds.some(id => typeof id !== 'string' || !/^[A-Za-z0-9]{22}$/.test(id)))
             invalid('spotifyIds는 22자리 Spotify ID 배열이어야 합니다.');
         const spotifyIds = [...new Set(r.spotifyIds as string[])];
         if (spotifyIds.length < 3) invalid('서로 다른 기준곡이 3곡 이상 필요합니다.');
         if (spotifyIds.length > n) invalid('기준곡 수는 n을 초과할 수 없습니다.');
-        return { mode: 'seeds', spotifyIds, n };
+        return { mode: 'seeds', spotifyIds, n, randomSeed };
     }
     if (r.mode === 'range') {
-        if (Object.keys(r).some(key => !['mode', 'valenceMin', 'valenceMax', 'energyMin', 'energyMax', 'n'].includes(key)))
+        if (Object.keys(r).some(key => !['mode', 'valenceMin', 'valenceMax', 'energyMin', 'energyMax', 'n', 'randomSeed'].includes(key)))
             invalid('지원하지 않는 영역 입력 필드입니다.');
         const { valenceMin, valenceMax, energyMin, energyMax } = r;
         if (!coordinate(valenceMin) || !coordinate(valenceMax) || !coordinate(energyMin) || !coordinate(energyMax))
             invalid('Valence/Energy 범위는 -1~1 유한 숫자여야 합니다.');
         if (valenceMin > valenceMax || energyMin > energyMax) invalid('최솟값은 최댓값보다 클 수 없습니다.');
-        return { mode: 'range', valenceMin, valenceMax, energyMin, energyMax, n };
+        return { mode: 'range', valenceMin, valenceMax, energyMin, energyMax, n, randomSeed };
     }
     return invalid('mode는 seeds 또는 range여야 합니다.');
 }
@@ -79,33 +86,35 @@ function inBufferedHull(p: Point, polygon: Point[]): boolean {
     if (polygon.length >= 3 && polygon.every((a, i) => cross(a, polygon[(i + 1) % polygon.length], p) >= 0)) return true;
     return polygon.some((a, i) => segmentDistance(p, a, polygon[(i + 1) % polygon.length]) <= BUFFER + EPS);
 }
-function shuffle<T>(values: T[], random: () => number): T[] {
-    for (let i = values.length - 1; i > 0; i--) {
-        const r = random();
-        if (!Number.isFinite(r) || r < 0 || r >= 1) throw new Error('Random source must return a number in [0, 1).');
-        const j = Math.floor(r * (i + 1));
-        [values[i], values[j]] = [values[j], values[i]];
-    }
-    return values;
+/** 곡마다 randomSeed와 곡 ID로 점수(32비트 해시)를 매겨 낮은 순으로 정렬합니다. 점수가 같으면 곡 ID순입니다. 곡의 입력 순서와 무관합니다. */
+function rankByScore(tracks: readonly Track[], randomSeed: number): Track[] {
+    return tracks
+        .map(track => ({ track, score: murmur3(track.id, randomSeed) }))
+        .sort((a, b) => a.score - b.score || (a.track.id < b.track.id ? -1 : a.track.id > b.track.id ? 1 : 0))
+        .map(entry => entry.track);
 }
 
 /** Input is the library's prevalidated, ID-unique recommendation snapshot. No DB access.
- * Uniform sampling without replacement, followed by a uniform result shuffle. */
-export function recommendCatalog(library: readonly Track[], input: CatalogRequest, random: () => number = Math.random): CatalogResult {
+ * 후보를 randomSeed로 정한 점수순으로 정렬해 앞의 곡을 뽑으므로, 같은 입력은 항상 같은 결과입니다. */
+export function recommendCatalog(library: readonly Track[], input: CatalogRequest): CatalogResult {
     const request = parseCatalogRequest(input);
-    const seeds: Track[] = request.mode === 'seeds' ? request.spotifyIds.map(id => {
-        const track = library.find(track => track.id === id);
-        if (!track || !hasValidCoordinates(track)) throw new CatalogRequestError('기준곡이 없거나 유효한 감정 좌표가 없습니다.');
-        return track;
-    }) : [];
+    const seeds: Track[] = request.mode === 'seeds'
+        ? request.spotifyIds.map(id => {
+            const track = library.find(track => track.id === id);
+            if (!track || !hasValidCoordinates(track)) throw new CatalogRequestError('기준곡이 없거나 유효한 감정 좌표가 없습니다.');
+            return track;
+        }) 
+        : [];
     const polygon = hull(seeds);
     const candidates = library.filter(p => request.mode === 'range'
         ? p.valence >= request.valenceMin - EPS && p.valence <= request.valenceMax + EPS &&
           p.arousal >= request.energyMin - EPS && p.arousal <= request.energyMax + EPS
         : inBufferedHull(p, polygon));
     const seedIds = new Set(seeds.map(t => t.id));
-    const others = shuffle(candidates.filter(t => !seedIds.has(t.id)), random).slice(0, request.n - seeds.length);
-    const tracks = shuffle([...seeds, ...others], random);
-    return { tracks, candidateCount: candidates.length,
-        status: tracks.length === 0 ? 'empty' : tracks.length < request.n ? 'insufficient-candidates' : 'complete' };
+    const others = rankByScore(candidates.filter(t => !seedIds.has(t.id)), request.randomSeed).slice(0, request.n - seeds.length);
+    const tracks = rankByScore([...seeds, ...others], request.randomSeed);
+    return {
+        tracks, candidateCount: candidates.length,
+        status: tracks.length === 0 ? 'empty' : tracks.length < request.n ? 'insufficient-candidates' : 'complete'
+    };
 }

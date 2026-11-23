@@ -51,9 +51,10 @@ type TrackWithContext = Track & {
 };
 
 // 점주가 설정하는 영역입니다. PUT /admin/mood, GET /admin/mood/preview, GET /mood가 같은 형식을 사용합니다.
+// randomSeed는 클라이언트가 정하는 0 이상 2^32 미만의 정수이며, 같은 요청은 같은 카탈로그를 만듭니다.
 type RegionRequest =
-  | { mode: 'seeds'; spotifyIds: string[]; n: number }   // 기준곡 방식
-  | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number };   // 범위 방식
+  | { mode: 'seeds'; spotifyIds: string[]; n: number; randomSeed: number }   // 기준곡 방식
+  | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
 
 // PUT /admin/mood는 T가 TrackWithContext, GET /admin/mood/preview는 T가 Track입니다.
 type RegionResult<T> = {
@@ -166,12 +167,12 @@ null
 
 응답 `200 OK` (기준곡 방식):
 ```json
-{ "mode": "seeds", "spotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30 }
+{ "mode": "seeds", "spotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30, "randomSeed": 1234567890 }
 ```
 
 응답 `200 OK` (범위 방식):
 ```json
-{ "mode": "range", "valenceMin": -0.5, "valenceMax": 0.5, "energyMin": -0.2, "energyMax": 0.8, "n": 30 }
+{ "mode": "range", "valenceMin": -0.5, "valenceMax": 0.5, "energyMin": -0.2, "energyMax": 0.8, "n": 30, "randomSeed": 1234567890 }
 ```
 
 ### GET /catalog
@@ -644,13 +645,13 @@ type TrackRequestEntry = {
 
 ### PUT /admin/mood
 
-점주가 카탈로그의 **영역**을 설정합니다. 서버가 요청한 영역 안에서 곡을 무작위로 뽑아 새 카탈로그를 만들고, 그 결과를 응답합니다. 입력 방식은 두 가지이며 `mode`로 구분합니다. 모든 좌표는 [-1, 1] 범위이고, 곡의 `arousal` 값은 Energy입니다.
+점주가 카탈로그의 **영역**을 설정합니다. 서버가 요청한 영역 안에서 `randomSeed`로 정해지는 순서대로 곡을 뽑아 새 카탈로그를 만들고, 그 결과를 응답합니다. 입력 방식은 두 가지이며 `mode`로 구분합니다. 모든 좌표는 [-1, 1] 범위이고, 곡의 `arousal` 값은 Energy입니다.
 
 #### mode: seeds (기준곡 방식)
 
 요청:
 ```json
-{ "mode": "seeds", "spotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30 }
+{ "mode": "seeds", "spotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30, "randomSeed": 1234567890 }
 ```
 
 - `spotifyIds`는 22자리 영숫자 Spotify ID의 배열입니다. 중복을 제거한 뒤 서로 다른 기준곡이 **최소 3곡, 최대 `n`곡**이어야 합니다.
@@ -661,7 +662,7 @@ type TrackRequestEntry = {
 
 요청:
 ```json
-{ "mode": "range", "valenceMin": -0.5, "valenceMax": 0.5, "energyMin": -0.2, "energyMax": 0.8, "n": 30 }
+{ "mode": "range", "valenceMin": -0.5, "valenceMax": 0.5, "energyMin": -0.2, "energyMax": 0.8, "n": 30, "randomSeed": 1234567890 }
 ```
 
 - `valenceMin`, `valenceMax`, `energyMin`, `energyMax`는 모두 [-1, 1] 범위의 유한한 숫자여야 합니다. 최솟값과 최댓값이 같아도 되지만, 최솟값이 최댓값보다 크면 안 됩니다. 문자열로 쓴 숫자는 허용되지 않습니다.
@@ -670,11 +671,12 @@ type TrackRequestEntry = {
 #### 공통 규칙
 
 - `n`은 필수이며 1~100 범위의 정수입니다. 영역 안에서 뽑을 곡 수입니다.
+- `randomSeed`는 필수이며 0 이상 4294967296 미만의 정수입니다. 클라이언트가 정하며, 서버는 이 값과 곡 ID로 후보마다 점수를 매겨 낮은 곡부터 뽑습니다. 값이 없거나 범위를 벗어나거나 정수가 아니면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 알 수 없는 필드와 `mode`가 없거나 알 수 없는 값이면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 영역의 경계는 포함합니다. 부동소수점 오차는 `1e-12`까지 허용하며, [-1, 1] 공간 밖에 좌표가 있는 곡은 제외합니다.
-- 곡은 다음과 같이 뽑습니다. `seeds` 방식은 기준곡을 반드시 포함하고, 나머지를 영역 안의 후보에서 균등하게 무작위로, 중복 없이 뽑습니다. `range` 방식은 영역 안의 후보 전체에서 뽑습니다. 결과의 순서도 무작위로 섞습니다.
+- 곡은 다음과 같이 뽑습니다. 후보마다 `randomSeed`와 곡 ID로 정해지는 점수를 매겨 낮은 곡부터 뽑습니다. `seeds` 방식은 기준곡을 반드시 포함하고, 나머지를 영역 안의 후보에서 이 순서대로 중복 없이 채웁니다. `range` 방식은 영역 안의 후보 전체에서 뽑습니다. 결과의 순서도 이 점수순입니다.
 - 영역 밖의 곡으로 부족한 수를 채우지 않습니다. 후보가 `n`곡보다 적으면 있는 만큼만 반환합니다.
-- 같은 요청을 다시 보내면 다른 곡이 뽑힐 수 있습니다. 무작위 시드나 결과를 확정하는 토큰은 제공하지 않습니다.
+- 같은 요청(`randomSeed` 포함)을 보내면 곡 데이터가 바뀌지 않는 한 항상 같은 곡이 같은 순서로 뽑힙니다. 다른 곡을 뽑고 싶으면 `randomSeed`를 바꿔서 요청해 주십시오. 미리보기(`GET /admin/mood/preview`)로 본 결과를 그대로 확정하려면 같은 `randomSeed`로 `PUT /admin/mood`를 호출합니다.
 - 요청이 올바르지 않으면 400이 반환되고 기존 카탈로그와 설정은 그대로 유지됩니다.
 - 성공하면 카탈로그가 새 곡들로 교체되고 `catalogHash`가 바뀝니다. 이미 대기열에 들어간 곡, 재생 중인 곡, 곡 쿨타임은 유지됩니다. 대기열의 곡은 새 영역 밖이어도 순서대로 재생됩니다.
 
@@ -727,14 +729,14 @@ type TrackRequestEntry = {
 - 기준곡은 `spotifyIds=ID1&spotifyIds=ID2&spotifyIds=ID3`처럼 파라미터를 반복해서 보냅니다. 쉼표로 구분하는 방식은 지원하지 않습니다. 반복할 수 있는 파라미터는 `spotifyIds`뿐이며, 다른 파라미터를 반복하면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 알 수 없는 파라미터, `mode`가 없거나 알 수 없는 값, 규칙에 맞지 않는 값은 400 Bad Request(`INVALID_INPUT`)입니다.
 
-응답 `200 OK` (`RegionResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/mood`의 응답과 같습니다. 무작위로 뽑으므로 이후 `PUT /admin/mood`의 결과와 같다는 보장은 없습니다.
+응답 `200 OK` (`RegionResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/mood`의 응답과 같습니다. 같은 요청(`randomSeed` 포함)으로 이후 `PUT /admin/mood`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
 
 - 각 곡에 `valence`와 `arousal`이 포함되어 있으므로 결과를 사분면 위에 점으로 표시할 수 있습니다.
 - 클릭이나 드래그마다 호출하지 말고 150~300ms 디바운스를 적용해 주십시오. 새 요청을 보낼 때에는 이전 요청을 취소하는 것을 권장합니다.
 
-요청: `GET /admin/mood/preview?mode=range&valenceMin=-0.5&valenceMax=0.5&energyMin=-0.2&energyMax=0.8&n=30`
+요청: `GET /admin/mood/preview?mode=range&valenceMin=-0.5&valenceMax=0.5&energyMin=-0.2&energyMax=0.8&n=30&randomSeed=1234567890`
 
-요청(기준곡 방식): `GET /admin/mood/preview?mode=seeds&n=30&spotifyIds=0kwrPQkiGVE8KTHalH1uMo&spotifyIds=5nvRWKWqHFMAxAxPTzDr0R&spotifyIds=0Q5VnK2DYzRyfqQRJuUtvi`
+요청(기준곡 방식): `GET /admin/mood/preview?mode=seeds&n=30&spotifyIds=0kwrPQkiGVE8KTHalH1uMo&spotifyIds=5nvRWKWqHFMAxAxPTzDr0R&spotifyIds=0Q5VnK2DYzRyfqQRJuUtvi&randomSeed=1234567890`
 
 응답 `200 OK`:
 ```json
@@ -889,7 +891,7 @@ Spotify 로그인(OAuth PKCE)과 토큰 관리는 Frontend에서 직접 처리�
 | 항목 | 상태 |
 |---|---|
 | 곡 메타데이터(제목, 아티스트, 이미지) | 코어 담당 팀원이 데이터를 다시 제공할 예정입니다. 필드 구조는 변경되지 않습니다. |
-| 추천 방식 | 영역 안에서 무작위로 뽑는 방식이며, 곡 좌표는 ReccoBeats의 Valence/Energy를 사용합니다. 세부 구현이 바뀌어도 API 구조는 동일합니다. |
+| 추천 방식 | 영역 안에서 클라이언트가 정한 `randomSeed`로 결정되는 순서대로 뽑는 방식이며, 곡 좌표는 ReccoBeats의 Valence/Energy를 사용합니다. 세부 구현이 바뀌어도 API 구조는 동일합니다. |
 | 곡 쿨타임 30분 | 서버 환경변수입니다. 값이 변경되어도 API 구조는 동일합니다. |
 | 카카오 `redirectUri` | 개발 환경과 배포 환경의 값을 Frontend와 Backend가 합의해 서버 환경변수와 카카오 콘솔에 일치시켜야 합니다. |
 | 에러 code 이름 | 초안 상태이며, 합의 후 확정합니다. |
@@ -898,6 +900,7 @@ Spotify 로그인(OAuth PKCE)과 토큰 관리는 Frontend에서 직접 처리�
 ### Frontend 연동 시 확인할 사항
 
 - 영역 입력 화면(기준곡 방식과 범위 방식), 결과의 `status`별 안내(`complete`, `insufficient-candidates`, `empty`) 표시
+- `randomSeed` 생성(0 이상 2^32 미만의 정수). 영역을 조정하며 미리보고 확정할 때는 같은 값을 쓰고, 다른 곡을 보고 싶을 때(다시 뽑기)는 새 값을 만듭니다.
 - 카탈로그 변경을 `GET /state`의 `catalogHash`로 감지하는 폴링 처리
 - 로그인 흐름(`state` 검증, `code` 전달, 토큰 저장)과 `401 CUSTOMER_UNAUTHORIZED` 수신 시 로그인 화면 이동
 - 곡 평가 버튼(`myRating` 표시, 평가 가능 여부 판단, 저장과 취소 후 화면 갱신, `409 NOT_NOW_PLAYING` 처리)

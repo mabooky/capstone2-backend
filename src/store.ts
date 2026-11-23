@@ -39,7 +39,7 @@ export interface StoreOptions {
     trackCooldownMs: number;
     /** 현재 시각(epoch ms)을 돌려주는 함수입니다. 시간에 의존하는 동작을 테스트할 때 활용할 수 있습니다. */
     now?: () => number;
-    /** 0 이상 1 미만의 난수를 돌려주는 함수입니다. 무작위로 고르는 동작을 테스트할 때 활용할 수 있습니다. */
+    /** 0 이상 1 미만의 난수를 돌려주는 함수입니다. 폴백 곡을 무작위로 고르는 동작을 테스트할 때 활용할 수 있습니다. */
     random?: () => number;
 }
 
@@ -99,7 +99,7 @@ export class Store {
     /** Validate and sample before committing any state; queue, playback and cooldowns are retained. */
     setRegionCatalog(input: CatalogRequest): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
         const request = parseCatalogRequest(input);
-        const result = this.trackLibrary.recommend(request, this.random);
+        const result = this.trackLibrary.recommend(request);
         this.region = request;
         this.catalog = result.tracks;
         this.catalogIds = new Set(this.catalog.map(track => track.id));
@@ -108,7 +108,7 @@ export class Store {
     }
 
     getRegionPreview(input: CatalogRequest): CatalogResult {
-        return this.trackLibrary.recommend(input, this.random);
+        return this.trackLibrary.recommend(input);
     }
 
     getRegion(): CatalogRequest | null {
