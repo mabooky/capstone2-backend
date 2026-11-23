@@ -17,7 +17,7 @@ export function createStoreRouter(trackLibrary: TrackLibrary, trackRatings: Trac
     });
 
     storeRouter.get('/catalog/config', (req, res) => {
-        res.json(res.locals.store.getRegion());
+        res.json(res.locals.store.getCatalogConfig());
     });
 
     // 로그인은 선택입니다. 로그인하지 않았으면 모든 곡의 myRating이 null입니다.

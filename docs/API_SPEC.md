@@ -73,10 +73,16 @@ type TrackWithContext = Track & {
   myRating: 1 | -1 | 0 | null;    // 요청한 사용자의 평가. 1 추천, -1 비추천, 0 취소, null 평가한 적 없음 (로그인하지 않았으면 항상 null)
 };
 
-// 점주가 설정하는 카탈로그 생성 조건입니다. PUT /admin/catalog/config, GET /admin/catalog/preview, GET /catalog/config가 같은 형식을 사용합니다.
+// 점주가 설정하는 카탈로그 생성 조건입니다. PUT /admin/catalog/config와 GET /admin/catalog/preview가 이 형식을 받습니다.
 // randomSeed는 클라이언트가 정하는 0 이상 2^32 미만의 정수이며, 같은 요청은 같은 카탈로그를 만듭니다.
 type CatalogConfig =
-  | { mode: 'seeds'; spotifyIds: string[]; n: number; randomSeed: number }   // 기준곡 방식
+  | { mode: 'seeds'; seedTrackSpotifyIds: string[]; n: number; randomSeed: number }   // 기준곡 방식
+  | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
+
+// CatalogConfig의 곡 ID를 곡 객체로 펼친 것입니다. GET /catalog/config가 이 형식을 반환합니다.
+// 기준곡 방식의 seedTrackSpotifyIds가 seedTracks로 바뀌는 것 말고는 CatalogConfig와 같습니다.
+type ExpandedCatalogConfig =
+  | { mode: 'seeds'; seedTracks: Track[]; n: number; randomSeed: number }    // 기준곡 방식. seedTrackSpotifyIds와 같은 순서
   | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
 
 // PUT /admin/catalog/config는 T가 TrackWithContext, GET /admin/catalog/preview는 T가 Track입니다.
@@ -100,7 +106,7 @@ type NowPlayingEntry = {
 };
 ```
 
-매장 응답에 포함된 곡은 모두 `TrackWithContext`입니다. 카탈로그, 검색 결과, `GET /state`의 `nowPlaying`과 `queue`, `POST /queue`와 `PUT /admin/now-playing`의 응답, `GET /admin/fallback-track`의 곡이 해당합니다. 매장과 무관한 `GET /api/me/requests`의 곡과 카탈로그에 속하지 않은 후보를 보여 주는 `GET /admin/catalog/preview`의 곡만 `requestStatus`와 `myRating`이 없는 `Track`입니다. `requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
+매장 응답에 포함된 곡은 모두 `TrackWithContext`입니다. 카탈로그, 검색 결과, `GET /state`의 `nowPlaying`과 `queue`, `POST /queue`와 `PUT /admin/now-playing`의 응답, `GET /admin/fallback-track`의 곡이 해당합니다. 매장과 무관한 `GET /api/me/requests`의 곡, 카탈로그에 속하지 않은 후보를 보여 주는 `GET /admin/catalog/preview`의 곡, 설정의 내용을 보여 주는 `GET /catalog/config`의 기준곡(`seedTracks`)만 `requestStatus`와 `myRating`이 없는 `Track`입니다. `requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
 
 | `requestStatus` | 화면 처리 |
 |---|---|
@@ -181,7 +187,10 @@ type NowPlayingEntry = {
 
 ### GET /catalog/config
 
-현재 활성인 영역 설정(`CatalogConfig`)을 반환합니다. 점주가 `PUT /admin/catalog/config`로 설정하기 전에는 설정이 없으므로 본문이 `null`입니다. 기준곡(`spotifyIds`)은 중복이 제거된 상태입니다.
+현재 활성인 영역 설정을 곡 ID 대신 곡 객체로 펼친 형태(`ExpandedCatalogConfig`)로 반환합니다. 점주가 `PUT /admin/catalog/config`로 설정하기 전에는 설정이 없으므로 본문이 `null`입니다.
+
+- 기준곡 방식이면 기준곡이 `seedTracks`에 `Track` 객체로 들어 있으므로, 별도의 조회 없이 제목과 앨범 커버를 표시할 수 있습니다. 순서는 설정할 때 보낸 `seedTrackSpotifyIds`의 순서이며 중복은 제거된 상태입니다.
+- 설정을 다시 저장하거나 미리보려면 `seedTracks`의 각 `id`를 `seedTrackSpotifyIds`로 보내면 됩니다.
 
 응답 `200 OK` (설정 전):
 ```json
@@ -190,7 +199,49 @@ null
 
 응답 `200 OK` (기준곡 방식):
 ```json
-{ "mode": "seeds", "spotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30, "randomSeed": 1234567890 }
+{
+  "mode": "seeds",
+  "seedTracks": [
+    {
+      "id": "0kwrPQkiGVE8KTHalH1uMo",
+      "title": "Super Shy",
+      "artist": "NewJeans",
+      "artistIds": ["6HvZYsbFfjnjFrWF950C9d"],
+      "duration": 154666,
+      "playCount": 924701492,
+      "albumId": "4N1fROq2oeyLGAlQ1C1j18",
+      "albumThumbUrl": "https://i.scdn.co/image/ab67616d000048510744690248ef3ba7b776ea7b",
+      "valence": 0.03,
+      "arousal": 0.634
+    },
+    {
+      "id": "5nvRWKWqHFMAxAxPTzDr0R",
+      "title": "How You Like That",
+      "artist": "BLACKPINK",
+      "artistIds": ["41MozSoPIsD1dJM0CLPjZF"],
+      "duration": 181263,
+      "playCount": 1306085031,
+      "albumId": "19vSttgdhH7PoAbvXBY7VT",
+      "albumThumbUrl": "https://i.scdn.co/image/ab67616d0000485157f5bb0f7a90c35a4bcbb727",
+      "valence": -0.298,
+      "arousal": 0.564
+    },
+    {
+      "id": "0Q5VnK2DYzRyfqQRJuUtvi",
+      "title": "LOVE DIVE",
+      "artist": "IVE",
+      "artistIds": ["6RHTUrRF63xao58xh9FXYJ"],
+      "duration": 177186,
+      "playCount": 514867332,
+      "albumId": "1AFVTHHm7kKoQ6Rgb25x3p",
+      "albumThumbUrl": "https://i.scdn.co/image/ab67616d000048519016f58cc49e6473e1207093",
+      "valence": 0.076,
+      "arousal": 0.418
+    }
+  ],
+  "n": 30,
+  "randomSeed": 1234567890
+}
 ```
 
 응답 `200 OK` (범위 방식):
@@ -674,10 +725,10 @@ type TrackRequestEntry = {
 
 요청:
 ```json
-{ "mode": "seeds", "spotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30, "randomSeed": 1234567890 }
+{ "mode": "seeds", "seedTrackSpotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30, "randomSeed": 1234567890 }
 ```
 
-- `spotifyIds`는 22자리 영숫자 Spotify ID의 배열입니다. 중복을 제거한 뒤 서로 다른 기준곡이 **최소 3곡, 최대 `n`곡**이어야 합니다.
+- `seedTrackSpotifyIds`는 22자리 영숫자 Spotify ID의 배열입니다. 중복을 제거한 뒤 서로 다른 기준곡이 **최소 3곡, 최대 `n`곡**이어야 합니다.
 - 데이터셋에 없거나 감정 좌표가 유효하지 않은 기준곡이 하나라도 있으면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 영역은 기준곡 좌표의 볼록 껍질(Convex Hull)에 반지름 0.1의 원형 버퍼를 적용한 모양입니다. 기준곡이 일직선이면 캡슐 모양, 모두 같은 좌표이면 원이 됩니다.
 
@@ -749,7 +800,7 @@ type TrackRequestEntry = {
 `PUT /admin/catalog/config`와 같은 `mode`와 필드, 같은 규칙을 쿼리 파라미터로 받습니다.
 
 - 숫자는 쿼리 문자열로 보냅니다.
-- 기준곡은 `spotifyIds=ID1&spotifyIds=ID2&spotifyIds=ID3`처럼 파라미터를 반복해서 보냅니다. 쉼표로 구분하는 방식은 지원하지 않습니다. 반복할 수 있는 파라미터는 `spotifyIds`뿐이며, 다른 파라미터를 반복하면 400 Bad Request(`INVALID_INPUT`)입니다.
+- 기준곡은 `seedTrackSpotifyIds=ID1&seedTrackSpotifyIds=ID2&seedTrackSpotifyIds=ID3`처럼 파라미터를 반복해서 보냅니다. 쉼표로 구분하는 방식은 지원하지 않습니다. 반복할 수 있는 파라미터는 `seedTrackSpotifyIds`뿐이며, 다른 파라미터를 반복하면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 알 수 없는 파라미터, `mode`가 없거나 알 수 없는 값, 규칙에 맞지 않는 값은 400 Bad Request(`INVALID_INPUT`)입니다.
 
 응답 `200 OK` (`CatalogResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/catalog/config`의 응답과 같습니다. 같은 요청(`randomSeed` 포함)으로 이후 `PUT /admin/catalog/config`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
@@ -759,7 +810,7 @@ type TrackRequestEntry = {
 
 요청: `GET /admin/catalog/preview?mode=range&valenceMin=-0.5&valenceMax=0.5&energyMin=-0.2&energyMax=0.8&n=30&randomSeed=1234567890`
 
-요청(기준곡 방식): `GET /admin/catalog/preview?mode=seeds&n=30&spotifyIds=0kwrPQkiGVE8KTHalH1uMo&spotifyIds=5nvRWKWqHFMAxAxPTzDr0R&spotifyIds=0Q5VnK2DYzRyfqQRJuUtvi&randomSeed=1234567890`
+요청(기준곡 방식): `GET /admin/catalog/preview?mode=seeds&n=30&seedTrackSpotifyIds=0kwrPQkiGVE8KTHalH1uMo&seedTrackSpotifyIds=5nvRWKWqHFMAxAxPTzDr0R&seedTrackSpotifyIds=0Q5VnK2DYzRyfqQRJuUtvi&randomSeed=1234567890`
 
 응답 `200 OK`:
 ```json

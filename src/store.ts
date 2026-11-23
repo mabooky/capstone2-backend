@@ -7,7 +7,7 @@ import type { ArtistLibrary } from './artists/artistLibrary.js';
 import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
-import { parseCatalogConfig, type CatalogConfig, type CatalogResult } from './tracks/catalogRecommendation.js';
+import { parseCatalogConfig, type CatalogConfig, type CatalogResult, type ExpandedCatalogConfig } from './tracks/catalogRecommendation.js';
 
 type PlaySource = 'request' | 'fallback';
 
@@ -119,8 +119,13 @@ export class Store {
         return this.trackLibrary.recommend(input);
     }
 
-    getRegion(): CatalogConfig | null {
-        return this.region && parseCatalogConfig(this.region);
+    /** GET /catalog/config: 현재 설정의 곡 ID를 곡 객체로 펼쳐 돌려줍니다. 설정하기 전이면 null입니다. */
+    getCatalogConfig(): ExpandedCatalogConfig | null {
+        const config = this.region;
+        if (config === null || config.mode === 'range') return config;
+        const { seedTrackSpotifyIds, ...rest } = config;
+        // 설정할 때 같은 곡 라이브러리로 기준곡이 모두 있는지 확인했으므로 get이 undefined를 돌려주지 않습니다.
+        return { ...rest, seedTracks: seedTrackSpotifyIds.map(id => this.trackLibrary.get(id)!) };
     }
 
     /** DELETE /admin/queue/:queueId: 대기열에서 곡을 제거합니다. 재생된 것이 아니므로 곡 쿨타임은 적용하지 않습니다. */
