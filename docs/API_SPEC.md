@@ -80,7 +80,7 @@ type CatalogRequest =
   | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
 
 // PUT /admin/catalog/config는 T가 TrackWithContext, GET /admin/catalog/preview는 T가 Track입니다.
-type RegionResult<T> = {
+type CatalogResult<T> = {
   tracks: T[];
   status: 'complete' | 'insufficient-candidates' | 'empty';
   candidateCount: number;  // 기준곡을 포함한 영역 안의 고유 후보 곡 수
@@ -703,7 +703,7 @@ type TrackRequestEntry = {
 - 요청이 올바르지 않으면 400이 반환되고 기존 카탈로그와 설정은 그대로 유지됩니다.
 - 성공하면 카탈로그가 새 곡들로 교체되고 `catalogHash`가 바뀝니다. 이미 대기열에 들어간 곡, 재생 중인 곡, 곡 쿨타임은 유지됩니다. 대기열의 곡은 새 영역 밖이어도 순서대로 재생됩니다.
 
-응답 `200 OK` (`RegionResult<TrackWithContext>`):
+응답 `200 OK` (`CatalogResult<TrackWithContext>`):
 
 | 필드 | 설명 |
 |---|---|
@@ -752,7 +752,7 @@ type TrackRequestEntry = {
 - 기준곡은 `spotifyIds=ID1&spotifyIds=ID2&spotifyIds=ID3`처럼 파라미터를 반복해서 보냅니다. 쉼표로 구분하는 방식은 지원하지 않습니다. 반복할 수 있는 파라미터는 `spotifyIds`뿐이며, 다른 파라미터를 반복하면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 알 수 없는 파라미터, `mode`가 없거나 알 수 없는 값, 규칙에 맞지 않는 값은 400 Bad Request(`INVALID_INPUT`)입니다.
 
-응답 `200 OK` (`RegionResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/catalog/config`의 응답과 같습니다. 같은 요청(`randomSeed` 포함)으로 이후 `PUT /admin/catalog/config`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
+응답 `200 OK` (`CatalogResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/catalog/config`의 응답과 같습니다. 같은 요청(`randomSeed` 포함)으로 이후 `PUT /admin/catalog/config`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
 
 - 각 곡에 `valence`와 `arousal`이 포함되어 있으므로 결과를 사분면 위에 점으로 표시할 수 있습니다.
 - 클릭이나 드래그마다 호출하지 말고 150~300ms 디바운스를 적용해 주십시오. 새 요청을 보낼 때에는 이전 요청을 취소하는 것을 권장합니다.
