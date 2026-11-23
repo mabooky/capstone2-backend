@@ -30,7 +30,19 @@ CREATE TABLE IF NOT EXISTS tracks_v3 (
 
 CREATE INDEX IF NOT EXISTS tracks_v3_artists_idx ON tracks_v3 USING gin (artist_reccobeats_ids);
 
--- 아래 albums_v4, tracks_v4는 capstone2-data 저장소의 v4/ 스크립트로 올린 새 곡 데이터이며, tracks_v3와는 별개입니다.
+-- 아래 artists_v4, albums_v4, tracks_v4는 capstone2-data 저장소의 v4/ 스크립트로 올린 새 곡 데이터이며, tracks_v3와는 별개입니다.
+
+-- 아티스트. 곡과 앨범의 artist_spotify_ids가 가리키는 아티스트이며, 블랙리스트 화면에서 이름과 사진을 보여 줄 때 씁니다.
+CREATE TABLE IF NOT EXISTS artists_v4 (
+    spotify_id text PRIMARY KEY CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
+    name text NOT NULL CHECK (btrim(name) <> ''),
+    -- 프로필 사진입니다. 사진이 없는 아티스트는 640픽셀만 있고, 그 이미지는 앨범 커버일 수 있습니다.
+    image_url_640 text,
+    image_url_320 text,
+    image_url_160 text,
+    monthly_listeners bigint CHECK (monthly_listeners >= 0), -- Spotify 월간 청취자 수. 값이 없으면 NULL
+    top_track_ids text[] NOT NULL DEFAULT '{}' -- 인기곡의 Spotify 곡 ID를 인기 순으로 담습니다. tracks_v4에 없는 곡도 있을 수 있습니다.
+);
 
 -- 앨범. tracks_v4의 곡이 속한 앨범입니다. 커버 이미지는 가로 640, 300, 64픽셀 크기별 URL입니다.
 CREATE TABLE IF NOT EXISTS albums_v4 (
