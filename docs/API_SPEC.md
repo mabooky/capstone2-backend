@@ -1,4 +1,4 @@
-# 스마트 주크박스 MVP — API 명세 (v20261120)
+# 스마트 주크박스 MVP — API 명세 (v20261123)
 
 이 문서는 Frontend 개발을 위한 API 계약서입니다. 모든 엔드포인트, 데이터 타입, 에러 코드, 예시 응답을 이 문서 하나에서 확인할 수 있습니다.
 
@@ -9,7 +9,7 @@
 | 항목 | 내용 |
 |---|---|
 | Base URL | `https://capstone2-backend-production.up.railway.app/api/stores/:storeId`. `:storeId`는 매장(테넌트)의 식별자이며, 매장을 등록할 때 서버가 무작위로 만든 8자 문자열입니다. 등록되지 않은 `storeId`로 요청하면 404 Not Found(`STORE_NOT_FOUND`)가 반환됩니다. |
-| 매장별 독립 동작 | 영역 설정, 대기열, 재생 상태, 곡 재생 기록, 곡 평가, 관리자 세션, 관리자 비밀번호는 모두 매장(`storeId`)별로 독립적으로 동작합니다. 한 매장의 요청은 다른 매장의 상태에 영향을 주지 않습니다. |
+| 매장별 독립 동작 | 카탈로그 설정(영역, 블랙리스트), 대기열, 재생 상태, 곡 재생 기록, 곡 평가, 관리자 세션, 관리자 비밀번호는 모두 매장(`storeId`)별로 독립적으로 동작합니다. 한 매장의 요청은 다른 매장의 상태에 영향을 주지 않습니다. |
 | 계정 API 경로 | 로그인과 사용자 관련 API(`/api/auth/*`, `/api/me/*`)는 매장과 무관하므로 `https://capstone2-backend-production.up.railway.app/api` 아래에 있습니다. `/api/stores/:storeId` 아래가 아닙니다. |
 | Content-Type | `application/json` |
 | 좌표 | 모든 `valence`, `arousal` 값은 **[-1, 1]** 범위입니다. 클라이언트에서 별도의 변환을 수행할 필요가 없습니다. |
@@ -26,6 +26,7 @@
 ```ts
 type RequestStatus =
   | 'available'         // 현재 카탈로그에 있으며 신청 가능
+  | 'blacklisted'       // 점주가 이 매장에서 제외한 곡 (검색 결과에서만 반환)
   | 'out-of-catalog'    // 현재 카탈로그에 없는 곡 (검색 결과에서만 반환)
   | 'already-queued'    // 이미 대기열에 있음
   | 'now-playing'       // 현재 재생 중
@@ -73,23 +74,34 @@ type TrackWithContext = Track & {
   myRating: 1 | -1 | 0 | null;    // 요청한 사용자의 평가. 1 추천, -1 비추천, 0 취소, null 평가한 적 없음 (로그인하지 않았으면 항상 null)
 };
 
-// 점주가 설정하는 카탈로그 생성 조건입니다. PUT /admin/catalog/config와 GET /admin/catalog/preview가 이 형식을 받습니다.
+// 점주가 설정하는 카탈로그 생성 조건입니다. PUT /admin/catalog/config와 POST /admin/catalog/preview가 이 형식을 받습니다.
 // randomSeed는 클라이언트가 정하는 0 이상 2^32 미만의 정수이며, 같은 요청은 같은 카탈로그를 만듭니다.
 type CatalogConfig =
-  | { mode: 'seeds'; seedTrackSpotifyIds: string[]; n: number; randomSeed: number }   // 기준곡 방식
-  | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
+  | { mode: 'seeds'; seedTrackSpotifyIds: string[]; blacklist: Blacklist; n: number; randomSeed: number }   // 기준곡 방식
+  | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; blacklist: Blacklist; n: number; randomSeed: number };   // 범위 방식
 
-// CatalogConfig의 곡 ID를 곡 객체로 펼친 것입니다. GET /catalog/config가 이 형식을 반환합니다.
-// 기준곡 방식의 seedTrackSpotifyIds가 seedTracks로 바뀌는 것 말고는 CatalogConfig와 같습니다.
+// 카탈로그에서 제외할 곡과 아티스트입니다. 제외할 것이 없으면 빈 배열을 보냅니다.
+type Blacklist = {
+  trackSpotifyIds: string[];    // 제외할 곡의 Spotify ID
+  artistSpotifyIds: string[];   // 제외할 아티스트의 Spotify ID. 이 아티스트가 참여한 곡을 모두 제외합니다.
+};
+
+// CatalogConfig의 곡 ID와 아티스트 ID를 객체로 펼친 것입니다. GET /catalog/config가 이 형식을 반환합니다.
+// 기준곡 방식의 seedTrackSpotifyIds가 seedTracks로, blacklist가 ExpandedBlacklist로 바뀌는 것 말고는 CatalogConfig와 같습니다.
 type ExpandedCatalogConfig =
-  | { mode: 'seeds'; seedTracks: Track[]; n: number; randomSeed: number }    // 기준곡 방식. seedTrackSpotifyIds와 같은 순서
-  | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
+  | { mode: 'seeds'; seedTracks: Track[]; blacklist: ExpandedBlacklist; n: number; randomSeed: number }    // 기준곡 방식. seedTrackSpotifyIds와 같은 순서
+  | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; blacklist: ExpandedBlacklist; n: number; randomSeed: number };   // 범위 방식
 
-// PUT /admin/catalog/config는 T가 TrackWithContext, GET /admin/catalog/preview는 T가 Track입니다.
+type ExpandedBlacklist = {
+  tracks: Track[];      // trackSpotifyIds와 같은 순서
+  artists: Artist[];    // artistSpotifyIds와 같은 순서
+};
+
+// PUT /admin/catalog/config는 T가 TrackWithContext, POST /admin/catalog/preview는 T가 Track입니다.
 type CatalogResult<T> = {
   tracks: T[];
   status: 'complete' | 'insufficient-candidates' | 'empty';
-  candidateCount: number;  // 기준곡을 포함한 영역 안의 고유 후보 곡 수
+  candidateCount: number;  // 기준곡을 포함한 영역 안의 고유 후보 곡 수. 블랙리스트에 걸린 곡은 세지 않습니다.
 };
 
 type QueueEntry = {
@@ -106,19 +118,20 @@ type NowPlayingEntry = {
 };
 ```
 
-매장 응답에 포함된 곡은 모두 `TrackWithContext`입니다. 카탈로그, 검색 결과, `GET /state`의 `nowPlaying`과 `queue`, `POST /queue`와 `PUT /admin/now-playing`의 응답, `GET /admin/fallback-track`의 곡이 해당합니다. 매장과 무관한 `GET /api/me/requests`의 곡, 카탈로그에 속하지 않은 후보를 보여 주는 `GET /admin/catalog/preview`의 곡, 설정의 내용을 보여 주는 `GET /catalog/config`의 기준곡(`seedTracks`)만 `requestStatus`와 `myRating`이 없는 `Track`입니다. `requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
+매장 응답에 포함된 곡은 모두 `TrackWithContext`입니다. 카탈로그, 검색 결과, `GET /state`의 `nowPlaying`과 `queue`, `POST /queue`와 `PUT /admin/now-playing`의 응답, `GET /admin/fallback-track`의 곡이 해당합니다. 매장과 무관한 `GET /api/me/requests`의 곡, 카탈로그에 속하지 않은 후보를 보여 주는 `GET /admin/catalog/preview`의 곡, 설정의 내용을 보여 주는 `GET /catalog/config`의 기준곡(`seedTracks`)과 블랙리스트 곡(`blacklist.tracks`)만 `requestStatus`와 `myRating`이 없는 `Track`입니다. `requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
 
 | `requestStatus` | 화면 처리 |
 |---|---|
 | `available` | 활성 상태로 표시합니다. |
+| `blacklisted` | 비활성 상태로 표시하고 "이 매장에서 제외한 곡"이라고 안내합니다. |
 | `out-of-catalog` | **비활성** 상태로 표시합니다. |
 | `already-queued` | 비활성 상태로 표시하고 "대기 중"이라고 안내합니다. |
 | `now-playing` | 비활성 상태로 표시하고 "재생 중"이라고 안내합니다. |
 | `recently-played` | 비활성 상태로 표시하고 "최근 재생됨"이라고 안내합니다. |
 
-하나의 곡에 여러 상태가 동시에 해당될 수 있습니다. 예를 들어 재생 중인 곡은 재생 시작 후 30분 이내이므로 `recently-played`에도 해당되며, 대기 중인 곡은 영역이 변경되어 카탈로그에서 빠지면 `out-of-catalog`에도 해당됩니다. 이 경우 서버는 아래 우선순위에서 가장 앞선 하나의 상태만 반환합니다.
+하나의 곡에 여러 상태가 동시에 해당될 수 있습니다. 예를 들어 재생 중인 곡은 재생 시작 후 30분 이내이므로 `recently-played`에도 해당되며, 대기 중인 곡은 영역이 변경되어 카탈로그에서 빠지면 `out-of-catalog`에도 해당됩니다. 블랙리스트에 걸린 곡은 카탈로그에도 없으므로 `out-of-catalog`에도 해당됩니다. 이 경우 서버는 아래 우선순위에서 가장 앞선 하나의 상태만 반환합니다.
 
-`now-playing` > `already-queued` > `out-of-catalog` > `recently-played` > `available`
+`now-playing` > `already-queued` > `blacklisted` > `out-of-catalog` > `recently-played` > `available`
 
 ### myRating
 
@@ -150,6 +163,7 @@ type NowPlayingEntry = {
 | 401 Unauthorized | `UNAUTHORIZED` | 관리자 토큰이 없거나 유효하지 않습니다. |
 | 401 Unauthorized | `INVALID_CREDENTIALS` | 관리자 비밀번호가 올바르지 않습니다. |
 | 401 Unauthorized | `INVALID_KAKAO_CODE` | 카카오 인가 코드가 올바르지 않거나, 만료되었거나, 이미 사용되었습니다. |
+| 403 Forbidden | `BLACKLISTED` | 점주가 이 매장에서 제외한 곡입니다. 곡 자체나 곡의 아티스트가 블랙리스트에 있습니다. |
 | 403 Forbidden | `OUT_OF_CATALOG` | 현재 카탈로그에 없는 곡입니다. |
 | 404 Not Found | `STORE_NOT_FOUND` | 등록되지 않은 `storeId`입니다. |
 | 404 Not Found | `TRACK_NOT_FOUND` | 데이터셋에 등록되지 않은 곡입니다. |
@@ -187,10 +201,11 @@ type NowPlayingEntry = {
 
 ### GET /catalog/config
 
-현재 활성인 영역 설정을 곡 ID 대신 곡 객체로 펼친 형태(`ExpandedCatalogConfig`)로 반환합니다. 점주가 `PUT /admin/catalog/config`로 설정하기 전에는 설정이 없으므로 본문이 `null`입니다.
+현재 활성인 카탈로그 설정을 곡 ID와 아티스트 ID 대신 객체로 펼친 형태(`ExpandedCatalogConfig`)로 반환합니다. 점주가 `PUT /admin/catalog/config`로 설정한 적이 없는 매장은 설정이 없으므로 본문이 `null`입니다. 로그인은 필요하지 않으며, 고객 화면과 관리자 화면이 함께 사용합니다.
 
-- 기준곡 방식이면 기준곡이 `seedTracks`에 `Track` 객체로 들어 있으므로, 별도의 조회 없이 제목과 앨범 커버를 표시할 수 있습니다. 순서는 설정할 때 보낸 `seedTrackSpotifyIds`의 순서이며 중복은 제거된 상태입니다.
-- 설정을 다시 저장하거나 미리보려면 `seedTracks`의 각 `id`를 `seedTrackSpotifyIds`로 보내면 됩니다.
+- 기준곡(`seedTracks`)과 블랙리스트(`blacklist.tracks`, `blacklist.artists`)가 `Track`, `Artist` 객체로 들어 있으므로, 별도의 조회 없이 제목, 이름, 이미지를 표시할 수 있습니다.
+- 순서는 설정할 때 보낸 ID의 순서이며 중복은 제거된 상태입니다.
+- 설정을 다시 저장하거나 미리보려면 각 객체의 `id`를 모아 `seedTrackSpotifyIds`, `blacklist.trackSpotifyIds`, `blacklist.artistSpotifyIds`로 보내면 됩니다.
 
 응답 `200 OK` (설정 전):
 ```json
@@ -239,19 +254,54 @@ null
       "arousal": 0.418
     }
   ],
+  "blacklist": {
+    "tracks": [
+      {
+        "id": "02wk5BttM0QL38ERjLPQJB",
+        "title": "Cool With You",
+        "artist": "NewJeans",
+        "artistIds": ["6HvZYsbFfjnjFrWF950C9d"],
+        "duration": 147880,
+        "playCount": 304160031,
+        "albumId": "4N1fROq2oeyLGAlQ1C1j18",
+        "albumThumbUrl": "https://i.scdn.co/image/ab67616d000048510744690248ef3ba7b776ea7b",
+        "valence": 0.064,
+        "arousal": 0.3
+      }
+    ],
+    "artists": [
+      {
+        "id": "6YVMFz59CuY7ngCxTxjpxE",
+        "name": "aespa",
+        "imageUrl640": "https://i.scdn.co/image/ab6761610000e5eb053bbb910dda6d4ab0618b8b",
+        "imageUrl320": "https://i.scdn.co/image/ab67616100005174053bbb910dda6d4ab0618b8b",
+        "imageUrl160": "https://i.scdn.co/image/ab6761610000f178053bbb910dda6d4ab0618b8b",
+        "monthlyListeners": 10305813
+      }
+    ]
+  },
   "n": 30,
   "randomSeed": 1234567890
 }
 ```
 
-응답 `200 OK` (범위 방식):
+응답 `200 OK` (범위 방식, 블랙리스트 없음):
 ```json
-{ "mode": "range", "valenceMin": -0.5, "valenceMax": 0.5, "energyMin": -0.2, "energyMax": 0.8, "n": 30, "randomSeed": 1234567890 }
+{
+  "mode": "range",
+  "valenceMin": -0.5,
+  "valenceMax": 0.5,
+  "energyMin": -0.2,
+  "energyMax": 0.8,
+  "blacklist": { "tracks": [], "artists": [] },
+  "n": 30,
+  "randomSeed": 1234567890
+}
 ```
 
 ### GET /catalog
 
-활성 카탈로그를 영역 설정이 만든 순서(무작위)로 반환합니다. 응답은 `TrackWithContext[]`이며, 모두 카탈로그 안의 곡이므로 `out-of-catalog` 상태는 포함되지 않습니다. 로그인하면 각 곡의 `myRating`에 사용자의 평가가 반영되고, 로그인하지 않았으면 모두 `null`입니다. 점주가 영역을 설정하기 전이거나 영역 안에 곡이 없으면 빈 배열(`[]`)입니다.
+활성 카탈로그를 카탈로그 설정이 만든 순서(무작위)로 반환합니다. 응답은 `TrackWithContext[]`이며, 모두 카탈로그 안의 곡이므로 `out-of-catalog`와 `blacklisted` 상태는 포함되지 않습니다. 로그인하면 각 곡의 `myRating`에 사용자의 평가가 반영되고, 로그인하지 않았으면 모두 `null`입니다. 점주가 영역을 설정하기 전이거나 영역 안에 곡이 없으면 빈 배열(`[]`)입니다.
 
 카탈로그가 바뀌었는지는 `GET /state`의 `catalogHash`로 감지합니다. 화면을 열 때는 **`GET /state`를 먼저 호출해 `catalogHash`를 저장한 뒤** 이 API를 호출하고, 이후 폴링에서 `catalogHash`가 저장한 값과 달라지면 새 값을 저장하고 이 API를 다시 호출해 주십시오. 신청이 실패한 후에도 다시 호출해 주십시오.
 
@@ -321,7 +371,7 @@ null
 
 ### GET /search
 
-분석된 전체 곡을 대상으로 검색합니다. 현재 카탈로그에 없는 곡은 `out-of-catalog` 상태로 반환되며, 화면에서는 비활성 상태로 표시해야 합니다.
+분석된 전체 곡을 대상으로 검색합니다. 점주가 블랙리스트로 제외한 곡은 `blacklisted`, 그 밖에 현재 카탈로그에 없는 곡은 `out-of-catalog` 상태로 반환되며, 화면에서는 비활성 상태로 표시해야 합니다.
 
 | 쿼리 파라미터 | 규칙 |
 |---|---|
@@ -356,7 +406,7 @@ null
       "albumThumbUrl": "https://i.scdn.co/image/ab67616d000048510744690248ef3ba7b776ea7b",
       "valence": 0.064,
       "arousal": 0.3,
-      "requestStatus": "available",
+      "requestStatus": "blacklisted",
       "myRating": 1
     },
     {
@@ -480,15 +530,19 @@ null
 | 1 | 401 Unauthorized | `CUSTOMER_UNAUTHORIZED` |
 | 2 | 400 Bad Request | `INVALID_INPUT` |
 | 3 | 404 Not Found | `TRACK_NOT_FOUND` |
-| 4 | 403 Forbidden | `OUT_OF_CATALOG` |
-| 5 | 409 Conflict | `TRACK_ALREADY_QUEUED` |
-| 6 | 429 Too Many Requests | `TRACK_COOLDOWN` |
-| 7 | 409 Conflict | `MY_REQUEST_PENDING` |
+| 4 | 403 Forbidden | `BLACKLISTED` |
+| 5 | 403 Forbidden | `OUT_OF_CATALOG` |
+| 6 | 409 Conflict | `TRACK_ALREADY_QUEUED` |
+| 7 | 429 Too Many Requests | `TRACK_COOLDOWN` |
+| 8 | 409 Conflict | `MY_REQUEST_PENDING` |
 
 에러 응답 예시는 다음과 같습니다. 나머지 코드는 2절의 형식과 표를 따릅니다.
 ```jsonc
 // 401 Unauthorized (CUSTOMER_UNAUTHORIZED): 저장한 토큰을 지우고 로그인 화면으로 이동합니다.
 { "error": { "code": "CUSTOMER_UNAUTHORIZED", "message": "로그인이 필요합니다." } }
+
+// 403 Forbidden (BLACKLISTED): 카탈로그를 다시 불러오고 안내 문구를 표시합니다.
+{ "error": { "code": "BLACKLISTED", "message": "이 매장에서 제외한 곡입니다." } }
 
 // 403 Forbidden (OUT_OF_CATALOG): 카탈로그를 다시 불러오고 안내 문구를 표시합니다.
 { "error": { "code": "OUT_OF_CATALOG", "message": "현재 카탈로그에 없는 곡입니다." } }
@@ -719,13 +773,19 @@ type TrackRequestEntry = {
 
 ### PUT /admin/catalog/config
 
-점주가 카탈로그의 **영역**을 설정합니다. 서버가 요청한 영역 안에서 `randomSeed`로 정해지는 순서대로 곡을 뽑아 새 카탈로그를 만들고, 그 결과를 응답합니다. 입력 방식은 두 가지이며 `mode`로 구분합니다. 모든 좌표는 [-1, 1] 범위이고, 곡의 `arousal` 값은 Energy입니다.
+점주가 카탈로그 설정(`CatalogConfig`)을 저장합니다. 서버가 요청한 영역 안에서 블랙리스트에 걸린 곡을 뺀 뒤 `randomSeed`로 정해지는 순서대로 곡을 뽑아 새 카탈로그를 만들고, 그 결과를 응답합니다. 영역의 입력 방식은 두 가지이며 `mode`로 구분합니다. 모든 좌표는 [-1, 1] 범위이고, 곡의 `arousal` 값은 Energy입니다.
 
 #### mode: seeds (기준곡 방식)
 
 요청:
 ```json
-{ "mode": "seeds", "seedTrackSpotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"], "n": 30, "randomSeed": 1234567890 }
+{
+  "mode": "seeds",
+  "seedTrackSpotifyIds": ["0kwrPQkiGVE8KTHalH1uMo", "5nvRWKWqHFMAxAxPTzDr0R", "0Q5VnK2DYzRyfqQRJuUtvi"],
+  "blacklist": { "trackSpotifyIds": ["02wk5BttM0QL38ERjLPQJB"], "artistSpotifyIds": ["6YVMFz59CuY7ngCxTxjpxE"] },
+  "n": 30,
+  "randomSeed": 1234567890
+}
 ```
 
 - `seedTrackSpotifyIds`는 22자리 영숫자 Spotify ID의 배열입니다. 중복을 제거한 뒤 서로 다른 기준곡이 **최소 3곡, 최대 `n`곡**이어야 합니다.
@@ -736,11 +796,29 @@ type TrackRequestEntry = {
 
 요청:
 ```json
-{ "mode": "range", "valenceMin": -0.5, "valenceMax": 0.5, "energyMin": -0.2, "energyMax": 0.8, "n": 30, "randomSeed": 1234567890 }
+{
+  "mode": "range",
+  "valenceMin": -0.5,
+  "valenceMax": 0.5,
+  "energyMin": -0.2,
+  "energyMax": 0.8,
+  "blacklist": { "trackSpotifyIds": [], "artistSpotifyIds": [] },
+  "n": 30,
+  "randomSeed": 1234567890
+}
 ```
 
 - `valenceMin`, `valenceMax`, `energyMin`, `energyMax`는 모두 [-1, 1] 범위의 유한한 숫자여야 합니다. 최솟값과 최댓값이 같아도 되지만, 최솟값이 최댓값보다 크면 안 됩니다. 문자열로 쓴 숫자는 허용되지 않습니다.
 - 영역은 버퍼가 없는 사각형입니다.
+
+#### 블랙리스트
+
+- `blacklist`는 두 방식 모두 필수이며, `trackSpotifyIds`와 `artistSpotifyIds`도 필수입니다. 제외할 것이 없으면 빈 배열(`[]`)을 보냅니다. 설정 전체를 교체하므로, 기존 블랙리스트를 유지하려면 항상 현재 블랙리스트 전체를 보내야 합니다.
+- 두 배열 모두 22자리 영숫자 Spotify ID의 배열이며, 중복은 제거됩니다. 개수 제한은 없습니다.
+- 데이터셋에 없는 곡이나 아티스트의 ID가 하나라도 있으면 400 Bad Request(`INVALID_INPUT`)입니다.
+- 곡 자신의 ID가 `trackSpotifyIds`에 있거나, 곡의 참여 아티스트(`artistIds`) 중 한 명이라도 `artistSpotifyIds`에 있으면 그 곡은 후보에서 제외됩니다. 피처링으로 참여한 곡도 제외됩니다.
+- 기준곡이 블랙리스트에 걸리면(곡 자신 또는 참여 아티스트) 400 Bad Request(`INVALID_INPUT`)입니다.
+- 블랙리스트 때문에 후보가 줄어 `status`가 `insufficient-candidates`나 `empty`가 될 수 있습니다.
 
 #### 공통 규칙
 
@@ -748,11 +826,11 @@ type TrackRequestEntry = {
 - `randomSeed`는 필수이며 0 이상 4294967296 미만의 정수입니다. 클라이언트가 정하며, 서버는 이 값과 곡 ID로 후보마다 점수를 매겨 낮은 곡부터 뽑습니다. 값이 없거나 범위를 벗어나거나 정수가 아니면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 알 수 없는 필드와 `mode`가 없거나 알 수 없는 값이면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 영역의 경계는 포함합니다. 부동소수점 오차는 `1e-12`까지 허용하며, [-1, 1] 공간 밖에 좌표가 있는 곡은 제외합니다.
-- 곡은 다음과 같이 뽑습니다. 후보마다 `randomSeed`와 곡 ID로 정해지는 점수를 매겨 낮은 곡부터 뽑습니다. `seeds` 방식은 기준곡을 반드시 포함하고, 나머지를 영역 안의 후보에서 이 순서대로 중복 없이 채웁니다. `range` 방식은 영역 안의 후보 전체에서 뽑습니다. 결과의 순서도 이 점수순입니다.
+- 곡은 다음과 같이 뽑습니다. 영역 안의 곡에서 블랙리스트에 걸린 곡을 뺀 것이 후보입니다. 후보마다 `randomSeed`와 곡 ID로 정해지는 점수를 매겨 낮은 곡부터 뽑습니다. `seeds` 방식은 기준곡을 반드시 포함하고, 나머지를 후보에서 이 순서대로 중복 없이 채웁니다. `range` 방식은 후보 전체에서 뽑습니다. 결과의 순서도 이 점수순입니다.
 - 영역 밖의 곡으로 부족한 수를 채우지 않습니다. 후보가 `n`곡보다 적으면 있는 만큼만 반환합니다.
-- 같은 요청(`randomSeed` 포함)을 보내면 곡 데이터가 바뀌지 않는 한 항상 같은 곡이 같은 순서로 뽑힙니다. 다른 곡을 뽑고 싶으면 `randomSeed`를 바꿔서 요청해 주십시오. 미리보기(`GET /admin/catalog/preview`)로 본 결과를 그대로 확정하려면 같은 `randomSeed`로 `PUT /admin/catalog/config`를 호출합니다.
+- 같은 요청(`randomSeed` 포함)을 보내면 곡 데이터가 바뀌지 않는 한 항상 같은 곡이 같은 순서로 뽑힙니다. 다른 곡을 뽑고 싶으면 `randomSeed`를 바꿔서 요청해 주십시오. 미리보기(`POST /admin/catalog/preview`)로 본 결과를 그대로 확정하려면 같은 요청 본문으로 `PUT /admin/catalog/config`를 호출합니다.
 - 요청이 올바르지 않으면 400이 반환되고 기존 카탈로그와 설정은 그대로 유지됩니다.
-- 성공하면 카탈로그가 새 곡들로 교체되고 `catalogHash`가 바뀝니다. 이미 대기열에 들어간 곡, 재생 중인 곡, 곡 쿨타임은 유지됩니다. 대기열의 곡은 새 영역 밖이어도 순서대로 재생됩니다.
+- 성공하면 설정이 DB에 저장되고, 카탈로그가 새 곡들로 교체되며 `catalogHash`가 바뀝니다. 이미 대기열에 들어간 곡, 재생 중인 곡, 곡 쿨타임은 유지됩니다. 대기열의 곡은 새 카탈로그에 없거나 블랙리스트에 걸려도 순서대로 재생됩니다.
 
 응답 `200 OK` (`CatalogResult<TrackWithContext>`):
 
@@ -760,9 +838,9 @@ type TrackRequestEntry = {
 |---|---|
 | `tracks` | 새 카탈로그입니다. 형식은 `GET /catalog`와 같습니다(`TrackWithContext[]`). 관리자 응답에서는 `myRating`이 항상 `null`입니다. |
 | `status` | `complete`는 `n`곡을 모두 채운 경우, `insufficient-candidates`는 후보가 `n`곡보다 적어 일부만 채운 경우, `empty`는 후보가 없어 0곡인 경우입니다. |
-| `candidateCount` | 기준곡을 포함한 영역 안의 고유 후보 곡 수입니다. |
+| `candidateCount` | 기준곡을 포함한 영역 안의 고유 후보 곡 수입니다. 블랙리스트에 걸린 곡은 세지 않습니다. |
 
-`status`가 `empty`이면 카탈로그가 비어 있어 고객이 곡을 신청할 수 없고 `GET /admin/fallback-track`은 409 Conflict(`NO_TRACKS`)를 반환합니다. 관리자 화면에서 영역을 다시 설정하도록 안내해 주십시오.
+`status`가 `empty`이면 카탈로그가 비어 있어 고객이 곡을 신청할 수 없고 `GET /admin/fallback-track`은 409 Conflict(`NO_TRACKS`)를 반환합니다. 관리자 화면에서 영역이나 블랙리스트를 다시 설정하도록 안내해 주십시오.
 
 후보가 1곡뿐인 영역을 요청했을 때의 응답은 다음과 같습니다.
 ```json
@@ -793,24 +871,30 @@ type TrackRequestEntry = {
 { "tracks": [], "status": "empty", "candidateCount": 0 }
 ```
 
-### GET /admin/catalog/preview
+### POST /admin/catalog/preview
 
-영역을 설정하기 전에 결과를 미리 봅니다. 점주가 영역을 조정하면서 어떤 곡들이 뽑히는지 살펴보는 용도입니다. **현재 설정, 카탈로그, 대기열을 변경하지 않습니다.** 확정은 `PUT /admin/catalog/config`로 합니다.
+설정을 저장하기 전에 결과를 미리 봅니다. 점주가 영역과 블랙리스트를 조정하면서 어떤 곡들이 뽑히는지 살펴보는 용도입니다. **현재 설정, 카탈로그, 대기열을 변경하지 않으며 DB에도 저장하지 않습니다.** 확정은 `PUT /admin/catalog/config`로 합니다.
 
-`PUT /admin/catalog/config`와 같은 `mode`와 필드, 같은 규칙을 쿼리 파라미터로 받습니다.
+요청 본문은 `PUT /admin/catalog/config`와 같은 `CatalogConfig`이며, 규칙도 같습니다. 규칙에 맞지 않으면 400 Bad Request(`INVALID_INPUT`)입니다.
 
-- 숫자는 쿼리 문자열로 보냅니다.
-- 기준곡은 `seedTrackSpotifyIds=ID1&seedTrackSpotifyIds=ID2&seedTrackSpotifyIds=ID3`처럼 파라미터를 반복해서 보냅니다. 쉼표로 구분하는 방식은 지원하지 않습니다. 반복할 수 있는 파라미터는 `seedTrackSpotifyIds`뿐이며, 다른 파라미터를 반복하면 400 Bad Request(`INVALID_INPUT`)입니다.
-- 알 수 없는 파라미터, `mode`가 없거나 알 수 없는 값, 규칙에 맞지 않는 값은 400 Bad Request(`INVALID_INPUT`)입니다.
-
-응답 `200 OK` (`CatalogResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/catalog/config`의 응답과 같습니다. 같은 요청(`randomSeed` 포함)으로 이후 `PUT /admin/catalog/config`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
+응답 `200 OK` (`CatalogResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/catalog/config`의 응답과 같습니다. 같은 요청 본문으로 이후 `PUT /admin/catalog/config`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
 
 - 각 곡에 `valence`와 `arousal`이 포함되어 있으므로 결과를 사분면 위에 점으로 표시할 수 있습니다.
 - 클릭이나 드래그마다 호출하지 말고 150~300ms 디바운스를 적용해 주십시오. 새 요청을 보낼 때에는 이전 요청을 취소하는 것을 권장합니다.
 
-요청: `GET /admin/catalog/preview?mode=range&valenceMin=-0.5&valenceMax=0.5&energyMin=-0.2&energyMax=0.8&n=30&randomSeed=1234567890`
-
-요청(기준곡 방식): `GET /admin/catalog/preview?mode=seeds&n=30&seedTrackSpotifyIds=0kwrPQkiGVE8KTHalH1uMo&seedTrackSpotifyIds=5nvRWKWqHFMAxAxPTzDr0R&seedTrackSpotifyIds=0Q5VnK2DYzRyfqQRJuUtvi&randomSeed=1234567890`
+요청:
+```json
+{
+  "mode": "range",
+  "valenceMin": -0.5,
+  "valenceMax": 0.5,
+  "energyMin": -0.2,
+  "energyMax": 0.8,
+  "blacklist": { "trackSpotifyIds": [], "artistSpotifyIds": [] },
+  "n": 30,
+  "randomSeed": 1234567890
+}
+```
 
 응답 `200 OK`:
 ```json
@@ -878,7 +962,8 @@ type TrackRequestEntry = {
 | 대기열이 비어 있지 않고, 맨 앞의 곡 | 대기열에서 제거하고 `source: "request"`로 기록합니다. |
 | 대기열이 비어 있지 않고, 맨 앞이 아닌 곡 | 409 Conflict(`NOT_NEXT_IN_QUEUE`)가 반환됩니다. `GET /state`를 다시 호출한 뒤 맨 앞의 곡으로 재시도해 주십시오. |
 | 대기열이 비어 있고, 카탈로그 안의 곡 | `source: "fallback"`으로 기록합니다. |
-| 대기열이 비어 있고, 카탈로그에 없는 곡 | 403 Forbidden(`OUT_OF_CATALOG`)이 반환됩니다. |
+| 대기열이 비어 있고, 블랙리스트에 걸린 곡 | 403 Forbidden(`BLACKLISTED`)이 반환됩니다. |
+| 대기열이 비어 있고, 그 밖에 카탈로그에 없는 곡 | 403 Forbidden(`OUT_OF_CATALOG`)이 반환됩니다. |
 
 - 이 호출 시점이 해당 곡의 **곡 쿨타임 시작 시각**이 됩니다.
 - 건너뛰기는 다음에 재생할 곡을 보고하는 것으로 처리합니다.
@@ -951,21 +1036,21 @@ Spotify 로그인(OAuth PKCE)과 토큰 관리는 Frontend에서 직접 처리�
 - **재생 주도권:** 다음에 재생할 곡은 관리자 클라이언트가 결정하고 `PUT /admin/now-playing`으로 서버에 보고합니다. 서버는 보고된 곡을 검증하고 기록합니다.
 - **곡 쿨타임:** 곡이 대기 중이거나 재생 중이거나, 재생이 시작된 지 30분 이내이면 신청할 수 없습니다. 재생 시작 시각은 `PUT /admin/now-playing`으로 재생이 보고된 시점입니다. 30분 값은 서버 환경변수로 조정할 수 있습니다.
 - **사용자당 대기 곡 수:** 로그인한 사용자는 매장마다 대기열에 곡을 하나만 둘 수 있습니다(`MY_REQUEST_PENDING`). 곡의 재생이 시작되어 대기열에서 빠지면 곧바로 다음 곡을 신청할 수 있습니다. 재생 중인 곡은 "대기 중"으로 간주하지 않으므로, 내 곡이 재생되는 동안에도 다음 곡을 신청할 수 있습니다.
-- **영역 변경:** 이미 대기열에 들어간 곡은 영역이 변경되어 새 카탈로그에서 빠져도 유지되며, 순서대로 재생됩니다. 이에 따라 대기열의 맨 앞 곡은 카탈로그에 없어도 `PUT /admin/now-playing`으로 보고할 수 있습니다.
+- **설정 변경:** 이미 대기열에 들어간 곡은 설정이 변경되어 새 카탈로그에서 빠지거나 블랙리스트에 걸려도 유지되며, 순서대로 재생됩니다. 이에 따라 대기열의 맨 앞 곡은 카탈로그에 없거나 블랙리스트에 걸려도 `PUT /admin/now-playing`으로 보고할 수 있습니다.
 - **관리자 세션:** 한 매장에서 한 번에 하나의 관리자 세션만 유효합니다. 같은 매장에서 새로 로그인하면 이전 세션의 토큰은 무효가 됩니다.
 - **관리자 탭 종료:** 관리자 탭이 닫히면 재생이 중단되고 재생 보고(`PUT /admin/now-playing`)도 이루어지지 않습니다. 이 경우 고객 화면에는 마지막 `nowPlaying`이 그대로 표시되며, 관리자가 재접속하면 "관리자 재접속 절차"에 따라 복구합니다.
 - **일시정지 미지원:** 서버가 재생 위치를 추적하지 않으므로 MVP에서는 일시정지를 지원하지 않습니다. 관리자 화면에서 일시정지 기능을 제공하지 않는 것을 권장하며, 건너뛰기는 다음에 재생할 곡을 `PUT /admin/now-playing`으로 보고하는 방식으로 처리합니다.
 - **곡 평가:** 고객은 매장마다 곡 하나에 추천(`1`) 또는 비추천(`-1`)을 하나만 남길 수 있고, 다시 평가하면 값이 바뀝니다. 새 평가는 그 매장에서 재생 중인 곡에만 남길 수 있으며, 취소한 곡을 포함해 이미 평가한 곡은 재생 중이 아니어도 바꿀 수 있습니다. 수집한 평가는 아직 카탈로그 생성에 사용하지 않습니다.
-- **초기 카탈로그:** 서버를 시작한 직후에는 영역이 설정되어 있지 않아 카탈로그가 비어 있습니다(`GET /catalog/config`는 `null`, `GET /catalog`는 `[]`). 해당 매장의 점주가 `PUT /admin/catalog/config`로 영역을 설정해야 고객이 곡을 신청할 수 있습니다.
+- **초기 카탈로그:** 한 번도 설정하지 않은 매장은 카탈로그가 비어 있습니다(`GET /catalog/config`는 `null`, `GET /catalog`는 `[]`). 해당 매장의 점주가 `PUT /admin/catalog/config`로 설정해야 고객이 곡을 신청할 수 있습니다. 설정한 매장은 서버를 시작할 때 저장된 설정으로 카탈로그를 다시 만들며, 곡 데이터가 같으면 재시작 전과 같은 카탈로그(같은 `catalogHash`)입니다.
 - **고객 세션:** 로그인하면 30일 동안 유효한 세션이 발급되며, 활동해도 연장되지 않습니다. 같은 사용자가 여러 기기에서 동시에 로그인할 수 있습니다.
-- **데이터 보관:** 대기열, 곡 재생 기록(곡 쿨타임), 영역 설정(카탈로그), 관리자 토큰은 메모리에만 있어 서버를 재시작하면 초기화됩니다. 사용자 정보, 고객 세션, 신청 이력, 곡 평가는 DB에 저장되어 재시작 후에도 유지됩니다. 곡 평가는 서버를 시작할 때 DB에서 모두 읽어 메모리에 올려 두므로, 읽지 못하면 서버가 시작되지 않습니다.
+- **데이터 보관:** 대기열, 곡 재생 기록(곡 쿨타임), 관리자 토큰은 메모리에만 있어 서버를 재시작하면 초기화됩니다. 사용자 정보, 고객 세션, 신청 이력, 곡 평가, 카탈로그 설정(영역, 블랙리스트, `n`, `randomSeed`)은 DB에 저장되어 재시작 후에도 유지됩니다. 곡 평가는 서버를 시작할 때 DB에서 모두 읽어 메모리에 올려 두므로, 읽지 못하면 서버가 시작되지 않습니다.
 
 ## 7. 미정 사항 및 변경 가능성
 
 | 항목 | 상태 |
 |---|---|
 | 곡 메타데이터(제목, 아티스트, 이미지) | 코어 담당 팀원이 데이터를 다시 제공할 예정입니다. 필드 구조는 변경되지 않습니다. |
-| 추천 방식 | 영역 안에서 클라이언트가 정한 `randomSeed`로 결정되는 순서대로 뽑는 방식이며, 곡 좌표는 ReccoBeats의 Valence/Energy를 사용합니다. 세부 구현이 바뀌어도 API 구조는 동일합니다. |
+| 추천 방식 | 영역 안에서 블랙리스트에 걸린 곡을 뺀 뒤 클라이언트가 정한 `randomSeed`로 결정되는 순서대로 뽑는 방식이며, 곡 좌표는 ReccoBeats의 Valence/Energy를 사용합니다. 세부 구현이 바뀌어도 API 구조는 동일합니다. |
 | 곡 쿨타임 30분 | 서버 환경변수입니다. 값이 변경되어도 API 구조는 동일합니다. |
 | 카카오 `redirectUri` | 개발 환경과 배포 환경의 값을 Frontend와 Backend가 합의해 서버 환경변수와 카카오 콘솔에 일치시켜야 합니다. |
 | 에러 code 이름 | 초안 상태이며, 합의 후 확정합니다. |
@@ -974,10 +1059,12 @@ Spotify 로그인(OAuth PKCE)과 토큰 관리는 Frontend에서 직접 처리�
 ### Frontend 연동 시 확인할 사항
 
 - 영역 입력 화면(기준곡 방식과 범위 방식), 결과의 `status`별 안내(`complete`, `insufficient-candidates`, `empty`) 표시
-- `randomSeed` 생성(0 이상 2^32 미만의 정수). 영역을 조정하며 미리보고 확정할 때는 같은 값을 쓰고, 다른 곡을 보고 싶을 때(다시 뽑기)는 새 값을 만듭니다.
+- `randomSeed` 생성(0 이상 2^32 미만의 정수). 영역과 블랙리스트를 조정하며 미리보고 확정할 때는 같은 값을 쓰고, 다른 곡을 보고 싶을 때(다시 뽑기)는 새 값을 만듭니다.
 - 카탈로그 변경을 `GET /state`의 `catalogHash`로 감지하는 폴링 처리
 - 로그인 흐름(`state` 검증, `code` 전달, 토큰 저장)과 `401 CUSTOMER_UNAUTHORIZED` 수신 시 로그인 화면 이동
 - 곡 평가 버튼(`myRating` 표시, 평가 가능 여부 판단, 저장과 취소 후 화면 갱신, `409 NOT_NOW_PLAYING` 처리)
+- `blacklisted` 상태 표시와 `403 BLACKLISTED` 처리
+- `Artist` 프로필 사진의 크기 선택(필요한 크기가 없을 때 다른 크기나 기본 이미지로 대체)
 
 ### 알려진 한계
 
