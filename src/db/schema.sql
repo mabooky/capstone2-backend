@@ -32,17 +32,17 @@ CREATE INDEX IF NOT EXISTS tracks_v3_artists_idx ON tracks_v3 USING gin (artist_
 
 -- 아래 albums_v4, tracks_v4는 capstone2-data 저장소의 v4/ 스크립트로 올린 새 곡 데이터이며, tracks_v3와는 별개입니다.
 
--- 앨범. tracks_v4의 곡이 속한 앨범입니다. 커버 이미지는 가로 640, 300, 64픽셀 크기별 URL이며, 해당 크기가 없으면 NULL입니다.
+-- 앨범. tracks_v4의 곡이 속한 앨범입니다. 커버 이미지는 가로 640, 300, 64픽셀 크기별 URL입니다.
 CREATE TABLE IF NOT EXISTS albums_v4 (
     spotify_id text PRIMARY KEY CHECK (spotify_id ~ '^[0-9A-Za-z]{22}$'),
     name text NOT NULL CHECK (btrim(name) <> ''),
     type text NOT NULL CHECK (type IN ('album', 'single', 'ep', 'compilation')),
     artist text NOT NULL CHECK (btrim(artist) <> ''), -- 앨범 아티스트 이름을 ', '로 이은 표시용 문자열
     artist_spotify_ids text[] NOT NULL CHECK (cardinality(artist_spotify_ids) > 0), -- artist와 같은 순서
-    release_date date,
-    cover_url_640 text,
-    cover_url_300 text,
-    cover_url_64 text
+    release_date date NOT NULL,
+    cover_url_640 text NOT NULL,
+    cover_url_300 text NOT NULL,
+    cover_url_64 text NOT NULL
 );
     
 -- 곡. 서비스에서 추천하고 재생하는 단위입니다.
