@@ -26,7 +26,7 @@
 ```ts
 type RequestStatus =
   | 'available'         // 가드레일 안에 있으며 신청 가능
-  | 'out-of-mood'       // 가드레일 밖의 곡 (검색 결과에서만 반환)
+  | 'out-of-guardrail'       // 가드레일 밖의 곡 (검색 결과에서만 반환)
   | 'already-queued'    // 이미 대기열에 있음
   | 'now-playing'       // 현재 재생 중
   | 'recently-played';  // 재생 시작 후 30분 이내 (곡 쿨타임)
@@ -50,13 +50,13 @@ type TrackWithContext = Track & {
   myRating: 1 | -1 | 0 | null;    // 요청한 사용자의 평가. 1 추천, -1 비추천, 0 취소, null 평가한 적 없음 (로그인하지 않았으면 항상 null)
 };
 
-// 점주가 설정하는 카탈로그 생성 조건입니다. PUT /admin/mood, GET /admin/mood/preview, GET /mood가 같은 형식을 사용합니다.
+// 점주가 설정하는 카탈로그 생성 조건입니다. PUT /admin/guardrail, GET /admin/guardrail/preview, GET /guardrail가 같은 형식을 사용합니다.
 // randomSeed는 클라이언트가 정하는 0 이상 2^32 미만의 정수이며, 같은 요청은 같은 카탈로그를 만듭니다.
 type CatalogRequest =
   | { mode: 'seeds'; spotifyIds: string[]; n: number; randomSeed: number }   // 기준곡 방식
   | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
 
-// PUT /admin/mood는 T가 TrackWithContext, GET /admin/mood/preview는 T가 Track입니다.
+// PUT /admin/guardrail는 T가 TrackWithContext, GET /admin/guardrail/preview는 T가 Track입니다.
 type RegionResult<T> = {
   tracks: T[];
   status: 'complete' | 'insufficient-candidates' | 'empty';
@@ -77,19 +77,19 @@ type NowPlayingEntry = {
 };
 ```
 
-매장 응답에 포함된 곡은 모두 `TrackWithContext`입니다. 카탈로그, 검색 결과, `GET /state`의 `nowPlaying`과 `queue`, `POST /queue`와 `PUT /admin/now-playing`의 응답, `GET /admin/fallback-track`의 곡이 해당합니다. 매장과 무관한 `GET /api/me/requests`의 곡과 카탈로그에 속하지 않은 후보를 보여 주는 `GET /admin/mood/preview`의 곡만 `requestStatus`와 `myRating`이 없는 `Track`입니다. `requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
+매장 응답에 포함된 곡은 모두 `TrackWithContext`입니다. 카탈로그, 검색 결과, `GET /state`의 `nowPlaying`과 `queue`, `POST /queue`와 `PUT /admin/now-playing`의 응답, `GET /admin/fallback-track`의 곡이 해당합니다. 매장과 무관한 `GET /api/me/requests`의 곡과 카탈로그에 속하지 않은 후보를 보여 주는 `GET /admin/guardrail/preview`의 곡만 `requestStatus`와 `myRating`이 없는 `Track`입니다. `requestStatus` 값에 따른 화면 처리 기준은 다음과 같습니다.
 
 | `requestStatus` | 화면 처리 |
 |---|---|
 | `available` | 활성 상태로 표시합니다. |
-| `out-of-mood` | **비활성** 상태로 표시합니다. |
+| `out-of-guardrail` | **비활성** 상태로 표시합니다. |
 | `already-queued` | 비활성 상태로 표시하고 "대기 중"이라고 안내합니다. |
 | `now-playing` | 비활성 상태로 표시하고 "재생 중"이라고 안내합니다. |
 | `recently-played` | 비활성 상태로 표시하고 "최근 재생됨"이라고 안내합니다. |
 
-하나의 곡에 여러 상태가 동시에 해당될 수 있습니다. 예를 들어 재생 중인 곡은 재생 시작 후 30분 이내이므로 `recently-played`에도 해당되며, 대기 중인 곡은 영역이 변경되어 가드레일 밖이 되면 `out-of-mood`에도 해당됩니다. 이 경우 서버는 아래 우선순위에서 가장 앞선 하나의 상태만 반환합니다.
+하나의 곡에 여러 상태가 동시에 해당될 수 있습니다. 예를 들어 재생 중인 곡은 재생 시작 후 30분 이내이므로 `recently-played`에도 해당되며, 대기 중인 곡은 영역이 변경되어 가드레일 밖이 되면 `out-of-guardrail`에도 해당됩니다. 이 경우 서버는 아래 우선순위에서 가장 앞선 하나의 상태만 반환합니다.
 
-`now-playing` > `already-queued` > `out-of-mood` > `recently-played` > `available`
+`now-playing` > `already-queued` > `out-of-guardrail` > `recently-played` > `available`
 
 ### myRating
 
@@ -121,7 +121,7 @@ type NowPlayingEntry = {
 | 401 Unauthorized | `UNAUTHORIZED` | 관리자 토큰이 없거나 유효하지 않습니다. |
 | 401 Unauthorized | `INVALID_CREDENTIALS` | 관리자 비밀번호가 올바르지 않습니다. |
 | 401 Unauthorized | `INVALID_KAKAO_CODE` | 카카오 인가 코드가 올바르지 않거나, 만료되었거나, 이미 사용되었습니다. |
-| 403 Forbidden | `OUT_OF_MOOD` | 현재 가드레일 밖의 곡입니다. |
+| 403 Forbidden | `OUT_OF_GUARDRAIL` | 현재 가드레일 밖의 곡입니다. |
 | 404 Not Found | `STORE_NOT_FOUND` | 등록되지 않은 `storeId`입니다. |
 | 404 Not Found | `TRACK_NOT_FOUND` | 데이터셋에 등록되지 않은 곡입니다. |
 | 404 Not Found | `QUEUE_ITEM_NOT_FOUND` | 존재하지 않는 `queueId`입니다. |
@@ -141,7 +141,7 @@ type NowPlayingEntry = {
 
 | 엔드포인트 | 로그인 |
 |---|---|
-| `GET /`, `GET /mood` | 필요하지 않습니다. |
+| `GET /`, `GET /guardrail` | 필요하지 않습니다. |
 | `GET /catalog`, `GET /search`, `GET /state`, `GET /me` | 선택입니다. 로그인하면 `mine`, 신청 가능 여부, 곡의 `myRating`에 사용자 정보가 반영됩니다. |
 | `POST /queue`, `PUT /ratings/:id`, `DELETE /ratings/:id` | 필수입니다. 로그인하지 않았으면 401 Unauthorized(`CUSTOMER_UNAUTHORIZED`)가 반환됩니다. |
 
@@ -156,9 +156,9 @@ type NowPlayingEntry = {
 { "storeId": "k3m9x2pq", "name": "제주대학교 공과대학4호관 414호" }
 ```
 
-### GET /mood
+### GET /guardrail
 
-현재 활성인 영역 설정(`CatalogRequest`)을 반환합니다. 점주가 `PUT /admin/mood`로 설정하기 전에는 설정이 없으므로 본문이 `null`입니다. 기준곡(`spotifyIds`)은 중복이 제거된 상태입니다.
+현재 활성인 영역 설정(`CatalogRequest`)을 반환합니다. 점주가 `PUT /admin/guardrail`로 설정하기 전에는 설정이 없으므로 본문이 `null`입니다. 기준곡(`spotifyIds`)은 중복이 제거된 상태입니다.
 
 응답 `200 OK` (설정 전):
 ```json
@@ -177,7 +177,7 @@ null
 
 ### GET /catalog
 
-활성 카탈로그를 영역 설정이 만든 순서(무작위)로 반환합니다. 응답은 `TrackWithContext[]`이며, 모두 가드레일 안의 곡이므로 `out-of-mood` 상태는 포함되지 않습니다. 로그인하면 각 곡의 `myRating`에 사용자의 평가가 반영되고, 로그인하지 않았으면 모두 `null`입니다. 점주가 영역을 설정하기 전이거나 영역 안에 곡이 없으면 빈 배열(`[]`)입니다.
+활성 카탈로그를 영역 설정이 만든 순서(무작위)로 반환합니다. 응답은 `TrackWithContext[]`이며, 모두 가드레일 안의 곡이므로 `out-of-guardrail` 상태는 포함되지 않습니다. 로그인하면 각 곡의 `myRating`에 사용자의 평가가 반영되고, 로그인하지 않았으면 모두 `null`입니다. 점주가 영역을 설정하기 전이거나 영역 안에 곡이 없으면 빈 배열(`[]`)입니다.
 
 카탈로그가 바뀌었는지는 `GET /state`의 `catalogHash`로 감지합니다. 화면을 열 때는 **`GET /state`를 먼저 호출해 `catalogHash`를 저장한 뒤** 이 API를 호출하고, 이후 폴링에서 `catalogHash`가 저장한 값과 달라지면 새 값을 저장하고 이 API를 다시 호출해 주십시오. 신청이 실패한 후에도 다시 호출해 주십시오.
 
@@ -247,7 +247,7 @@ null
 
 ### GET /search
 
-분석된 전체 곡을 대상으로 검색합니다. 가드레일 밖의 곡은 `out-of-mood` 상태로 반환되며, 화면에서는 비활성 상태로 표시해야 합니다.
+분석된 전체 곡을 대상으로 검색합니다. 가드레일 밖의 곡은 `out-of-guardrail` 상태로 반환되며, 화면에서는 비활성 상태로 표시해야 합니다.
 
 | 쿼리 파라미터 | 규칙 |
 |---|---|
@@ -296,7 +296,7 @@ null
       "albumThumbUrl": "https://i.scdn.co/image/ab67616d000048519d28fd01859073a3ae6ea209",
       "valence": 0.566,
       "arousal": 0.87,
-      "requestStatus": "out-of-mood",
+      "requestStatus": "out-of-guardrail",
       "myRating": -1
     }
   ]
@@ -406,7 +406,7 @@ null
 | 1 | 401 Unauthorized | `CUSTOMER_UNAUTHORIZED` |
 | 2 | 400 Bad Request | `INVALID_INPUT` |
 | 3 | 404 Not Found | `TRACK_NOT_FOUND` |
-| 4 | 403 Forbidden | `OUT_OF_MOOD` |
+| 4 | 403 Forbidden | `OUT_OF_GUARDRAIL` |
 | 5 | 409 Conflict | `TRACK_ALREADY_QUEUED` |
 | 6 | 429 Too Many Requests | `TRACK_COOLDOWN` |
 | 7 | 409 Conflict | `MY_REQUEST_PENDING` |
@@ -416,8 +416,8 @@ null
 // 401 Unauthorized (CUSTOMER_UNAUTHORIZED): 저장한 토큰을 지우고 로그인 화면으로 이동합니다.
 { "error": { "code": "CUSTOMER_UNAUTHORIZED", "message": "로그인이 필요합니다." } }
 
-// 403 Forbidden (OUT_OF_MOOD): 카탈로그를 다시 불러오고 안내 문구를 표시합니다.
-{ "error": { "code": "OUT_OF_MOOD", "message": "현재 카탈로그에 없는 곡입니다." } }
+// 403 Forbidden (OUT_OF_GUARDRAIL): 카탈로그를 다시 불러오고 안내 문구를 표시합니다.
+{ "error": { "code": "OUT_OF_GUARDRAIL", "message": "현재 카탈로그에 없는 곡입니다." } }
 
 // 429 Too Many Requests (TRACK_COOLDOWN)
 { "error": { "code": "TRACK_COOLDOWN", "message": "최근에 재생된 곡입니다.", "retryAfterSec": 1200 } }
@@ -625,7 +625,7 @@ type TrackRequestEntry = {
 
 ## 5. 관리자 전용 API
 
-`/admin/login`을 제외한 모든 요청에는 관리자 토큰을 `Authorization: Bearer <token>` 헤더로 보내야 합니다. 관리자 화면에서 대기열과 설정을 표시할 때에는 공개 API의 `GET /state`, `GET /mood`, `GET /catalog`를 그대로 사용하며, 이때는 관리자 토큰을 보내지 않아도 됩니다.
+`/admin/login`을 제외한 모든 요청에는 관리자 토큰을 `Authorization: Bearer <token>` 헤더로 보내야 합니다. 관리자 화면에서 대기열과 설정을 표시할 때에는 공개 API의 `GET /state`, `GET /guardrail`, `GET /catalog`를 그대로 사용하며, 이때는 관리자 토큰을 보내지 않아도 됩니다.
 
 ### POST /admin/login
 
@@ -643,7 +643,7 @@ type TrackRequestEntry = {
 
 관리자 세션은 매장별로 하나만 유효합니다. 같은 매장에서 새로 로그인하면 이전에 발급된 토큰은 무효가 되며(다른 매장의 토큰에는 영향이 없습니다), 서버를 재시작하면 모든 토큰이 무효가 됩니다. 무효한 토큰으로 요청하면 401 Unauthorized(`UNAUTHORIZED`)가 반환됩니다. 이 응답을 받으면 재생을 중단하고 로그인 화면으로 이동시켜 주십시오. 다른 기기에서 로그인하여 이전 세션이 무효가 된 경우에도 같은 응답이 반환됩니다.
 
-### PUT /admin/mood
+### PUT /admin/guardrail
 
 점주가 카탈로그의 **영역**을 설정합니다. 서버가 요청한 영역 안에서 `randomSeed`로 정해지는 순서대로 곡을 뽑아 새 카탈로그를 만들고, 그 결과를 응답합니다. 입력 방식은 두 가지이며 `mode`로 구분합니다. 모든 좌표는 [-1, 1] 범위이고, 곡의 `arousal` 값은 Energy입니다.
 
@@ -676,7 +676,7 @@ type TrackRequestEntry = {
 - 영역의 경계는 포함합니다. 부동소수점 오차는 `1e-12`까지 허용하며, [-1, 1] 공간 밖에 좌표가 있는 곡은 제외합니다.
 - 곡은 다음과 같이 뽑습니다. 후보마다 `randomSeed`와 곡 ID로 정해지는 점수를 매겨 낮은 곡부터 뽑습니다. `seeds` 방식은 기준곡을 반드시 포함하고, 나머지를 영역 안의 후보에서 이 순서대로 중복 없이 채웁니다. `range` 방식은 영역 안의 후보 전체에서 뽑습니다. 결과의 순서도 이 점수순입니다.
 - 영역 밖의 곡으로 부족한 수를 채우지 않습니다. 후보가 `n`곡보다 적으면 있는 만큼만 반환합니다.
-- 같은 요청(`randomSeed` 포함)을 보내면 곡 데이터가 바뀌지 않는 한 항상 같은 곡이 같은 순서로 뽑힙니다. 다른 곡을 뽑고 싶으면 `randomSeed`를 바꿔서 요청해 주십시오. 미리보기(`GET /admin/mood/preview`)로 본 결과를 그대로 확정하려면 같은 `randomSeed`로 `PUT /admin/mood`를 호출합니다.
+- 같은 요청(`randomSeed` 포함)을 보내면 곡 데이터가 바뀌지 않는 한 항상 같은 곡이 같은 순서로 뽑힙니다. 다른 곡을 뽑고 싶으면 `randomSeed`를 바꿔서 요청해 주십시오. 미리보기(`GET /admin/guardrail/preview`)로 본 결과를 그대로 확정하려면 같은 `randomSeed`로 `PUT /admin/guardrail`를 호출합니다.
 - 요청이 올바르지 않으면 400이 반환되고 기존 카탈로그와 설정은 그대로 유지됩니다.
 - 성공하면 카탈로그가 새 곡들로 교체되고 `catalogHash`가 바뀝니다. 이미 대기열에 들어간 곡, 재생 중인 곡, 곡 쿨타임은 유지됩니다. 대기열의 곡은 새 영역 밖이어도 순서대로 재생됩니다.
 
@@ -719,24 +719,24 @@ type TrackRequestEntry = {
 { "tracks": [], "status": "empty", "candidateCount": 0 }
 ```
 
-### GET /admin/mood/preview
+### GET /admin/guardrail/preview
 
-영역을 설정하기 전에 결과를 미리 봅니다. 점주가 영역을 조정하면서 어떤 곡들이 뽑히는지 살펴보는 용도입니다. **현재 설정, 카탈로그, 대기열을 변경하지 않습니다.** 확정은 `PUT /admin/mood`로 합니다.
+영역을 설정하기 전에 결과를 미리 봅니다. 점주가 영역을 조정하면서 어떤 곡들이 뽑히는지 살펴보는 용도입니다. **현재 설정, 카탈로그, 대기열을 변경하지 않습니다.** 확정은 `PUT /admin/guardrail`로 합니다.
 
-`PUT /admin/mood`와 같은 `mode`와 필드, 같은 규칙을 쿼리 파라미터로 받습니다.
+`PUT /admin/guardrail`와 같은 `mode`와 필드, 같은 규칙을 쿼리 파라미터로 받습니다.
 
 - 숫자는 쿼리 문자열로 보냅니다.
 - 기준곡은 `spotifyIds=ID1&spotifyIds=ID2&spotifyIds=ID3`처럼 파라미터를 반복해서 보냅니다. 쉼표로 구분하는 방식은 지원하지 않습니다. 반복할 수 있는 파라미터는 `spotifyIds`뿐이며, 다른 파라미터를 반복하면 400 Bad Request(`INVALID_INPUT`)입니다.
 - 알 수 없는 파라미터, `mode`가 없거나 알 수 없는 값, 규칙에 맞지 않는 값은 400 Bad Request(`INVALID_INPUT`)입니다.
 
-응답 `200 OK` (`RegionResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/mood`의 응답과 같습니다. 같은 요청(`randomSeed` 포함)으로 이후 `PUT /admin/mood`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
+응답 `200 OK` (`RegionResult<Track>`): `tracks`가 `Track[]`이며 미리보기에는 곡의 신청 상태와 평가가 필요하지 않아 `requestStatus`와 `myRating`이 포함되지 않습니다. 나머지 필드는 `PUT /admin/guardrail`의 응답과 같습니다. 같은 요청(`randomSeed` 포함)으로 이후 `PUT /admin/guardrail`를 호출하면 곡 데이터가 바뀌지 않는 한 같은 곡이 같은 순서로 확정됩니다.
 
 - 각 곡에 `valence`와 `arousal`이 포함되어 있으므로 결과를 사분면 위에 점으로 표시할 수 있습니다.
 - 클릭이나 드래그마다 호출하지 말고 150~300ms 디바운스를 적용해 주십시오. 새 요청을 보낼 때에는 이전 요청을 취소하는 것을 권장합니다.
 
-요청: `GET /admin/mood/preview?mode=range&valenceMin=-0.5&valenceMax=0.5&energyMin=-0.2&energyMax=0.8&n=30&randomSeed=1234567890`
+요청: `GET /admin/guardrail/preview?mode=range&valenceMin=-0.5&valenceMax=0.5&energyMin=-0.2&energyMax=0.8&n=30&randomSeed=1234567890`
 
-요청(기준곡 방식): `GET /admin/mood/preview?mode=seeds&n=30&spotifyIds=0kwrPQkiGVE8KTHalH1uMo&spotifyIds=5nvRWKWqHFMAxAxPTzDr0R&spotifyIds=0Q5VnK2DYzRyfqQRJuUtvi&randomSeed=1234567890`
+요청(기준곡 방식): `GET /admin/guardrail/preview?mode=seeds&n=30&spotifyIds=0kwrPQkiGVE8KTHalH1uMo&spotifyIds=5nvRWKWqHFMAxAxPTzDr0R&spotifyIds=0Q5VnK2DYzRyfqQRJuUtvi&randomSeed=1234567890`
 
 응답 `200 OK`:
 ```json
@@ -804,7 +804,7 @@ type TrackRequestEntry = {
 | 대기열이 비어 있지 않고, 맨 앞의 곡 | 대기열에서 제거하고 `source: "request"`로 기록합니다. |
 | 대기열이 비어 있지 않고, 맨 앞이 아닌 곡 | 409 Conflict(`NOT_NEXT_IN_QUEUE`)가 반환됩니다. `GET /state`를 다시 호출한 뒤 맨 앞의 곡으로 재시도해 주십시오. |
 | 대기열이 비어 있고, 가드레일 안의 곡 | `source: "fallback"`으로 기록합니다. |
-| 대기열이 비어 있고, 가드레일 밖의 곡 | 403 Forbidden(`OUT_OF_MOOD`)이 반환됩니다. |
+| 대기열이 비어 있고, 가드레일 밖의 곡 | 403 Forbidden(`OUT_OF_GUARDRAIL`)이 반환됩니다. |
 
 - 이 호출 시점이 해당 곡의 **곡 쿨타임 시작 시각**이 됩니다.
 - 건너뛰기는 다음에 재생할 곡을 보고하는 것으로 처리합니다.
@@ -882,7 +882,7 @@ Spotify 로그인(OAuth PKCE)과 토큰 관리는 Frontend에서 직접 처리�
 - **관리자 탭 종료:** 관리자 탭이 닫히면 재생이 중단되고 재생 보고(`PUT /admin/now-playing`)도 이루어지지 않습니다. 이 경우 고객 화면에는 마지막 `nowPlaying`이 그대로 표시되며, 관리자가 재접속하면 "관리자 재접속 절차"에 따라 복구합니다.
 - **일시정지 미지원:** 서버가 재생 위치를 추적하지 않으므로 MVP에서는 일시정지를 지원하지 않습니다. 관리자 화면에서 일시정지 기능을 제공하지 않는 것을 권장하며, 건너뛰기는 다음에 재생할 곡을 `PUT /admin/now-playing`으로 보고하는 방식으로 처리합니다.
 - **곡 평가:** 고객은 매장마다 곡 하나에 추천(`1`) 또는 비추천(`-1`)을 하나만 남길 수 있고, 다시 평가하면 값이 바뀝니다. 새 평가는 그 매장에서 재생 중인 곡에만 남길 수 있으며, 취소한 곡을 포함해 이미 평가한 곡은 재생 중이 아니어도 바꿀 수 있습니다. 수집한 평가는 아직 카탈로그 생성에 사용하지 않습니다.
-- **초기 카탈로그:** 서버를 시작한 직후에는 영역이 설정되어 있지 않아 카탈로그가 비어 있습니다(`GET /mood`는 `null`, `GET /catalog`는 `[]`). 해당 매장의 점주가 `PUT /admin/mood`로 영역을 설정해야 고객이 곡을 신청할 수 있습니다.
+- **초기 카탈로그:** 서버를 시작한 직후에는 영역이 설정되어 있지 않아 카탈로그가 비어 있습니다(`GET /guardrail`는 `null`, `GET /catalog`는 `[]`). 해당 매장의 점주가 `PUT /admin/guardrail`로 영역을 설정해야 고객이 곡을 신청할 수 있습니다.
 - **고객 세션:** 로그인하면 30일 동안 유효한 세션이 발급되며, 활동해도 연장되지 않습니다. 같은 사용자가 여러 기기에서 동시에 로그인할 수 있습니다.
 - **데이터 보관:** 대기열, 곡 재생 기록(곡 쿨타임), 영역 설정(카탈로그), 관리자 토큰은 메모리에만 있어 서버를 재시작하면 초기화됩니다. 사용자 정보, 고객 세션, 신청 이력, 곡 평가는 DB에 저장되어 재시작 후에도 유지됩니다. 곡 평가는 서버를 시작할 때 DB에서 모두 읽어 메모리에 올려 두므로, 읽지 못하면 서버가 시작되지 않습니다.
 

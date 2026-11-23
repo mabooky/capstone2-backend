@@ -16,7 +16,7 @@ export function createStoreRouter(trackLibrary: TrackLibrary, trackRatings: Trac
         res.json({ storeId: store.id, name: store.name });
     });
 
-    storeRouter.get('/mood', (req, res) => {
+    storeRouter.get('/guardrail', (req, res) => {
         res.json(res.locals.store.getRegion());
     });
 
