@@ -63,7 +63,8 @@ export class Store {
     private readonly now: () => number;
     private readonly random: () => number;
 
-    private region: CatalogConfig | null = null;
+    /** 현재 카탈로그를 만든 설정입니다. 설정하기 전이면 null입니다. */
+    private catalogConfig: CatalogConfig | null = null;
     /** 현재 카탈로그입니다. 서버를 시작한 직후에는 영역을 설정하기 전이므로 비어 있습니다. */
     private catalog: Track[] = [];
     private catalogIds: Set<string> = new Set();
@@ -104,24 +105,28 @@ export class Store {
         return this.adminToken !== null && token === this.adminToken;
     }
 
-    /** Validate and sample before committing any state; queue, playback and cooldowns are retained. */
-    setRegionCatalog(input: CatalogConfig): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
+    /**
+     * PUT /admin/catalog/config: 설정을 검증하고 카탈로그를 만든 뒤에 상태를 바꿉니다.
+     * 대기열, 재생 중인 곡, 곡 쿨타임은 그대로 둡니다.
+     */
+    setCatalogConfig(input: CatalogConfig): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
         const config = parseCatalogConfig(input);
         const result = this.trackLibrary.recommend(config);
-        this.region = config;
+        this.catalogConfig = config;
         this.catalog = result.tracks;
         this.catalogIds = new Set(this.catalog.map(track => track.id));
         this.catalogHash = hashCatalog(this.catalog);
         return { ...result, tracks: this.getCatalog() };
     }
 
-    getRegionPreview(input: CatalogConfig): CatalogResult {
+    /** 미리보기: 설정으로 만들어질 카탈로그를 돌려줍니다. 상태는 바꾸지 않습니다. */
+    previewCatalog(input: CatalogConfig): CatalogResult {
         return this.trackLibrary.recommend(input);
     }
 
     /** GET /catalog/config: 현재 설정의 곡 ID를 곡 객체로 펼쳐 돌려줍니다. 설정하기 전이면 null입니다. */
     getCatalogConfig(): ExpandedCatalogConfig | null {
-        const config = this.region;
+        const config = this.catalogConfig;
         if (config === null || config.mode === 'range') return config;
         const { seedTrackSpotifyIds, ...rest } = config;
         // 설정할 때 같은 곡 라이브러리로 기준곡이 모두 있는지 확인했으므로 get이 undefined를 돌려주지 않습니다.

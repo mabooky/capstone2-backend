@@ -20,11 +20,11 @@ adminRouter.post('/login', async (req, res) => {
 adminRouter.use(requireAdmin);
 
 adminRouter.put('/catalog/config', (req, res) => {
-    res.json(res.locals.store.setRegionCatalog(parseCatalogConfig(req.body)));
+    res.json(res.locals.store.setCatalogConfig(parseCatalogConfig(req.body)));
 });
 
 adminRouter.get('/catalog/preview', (req, res) => {
-    res.json(res.locals.store.getRegionPreview(regionQuery(req.query)));
+    res.json(res.locals.store.previewCatalog(regionQuery(req.query)));
 });
 
 adminRouter.get('/fallback-track', (req, res) => {
