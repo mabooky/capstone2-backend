@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ApiError } from './errors.js';
 import { murmur3 } from './murmur3.js';
 import type { TrackLibrary } from './tracks/trackLibrary.js';
+import type { AlbumLibrary } from './albums/albumLibrary.js';
 import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
@@ -76,7 +77,12 @@ export class Store {
     /** 현재 유효한 관리자 토큰입니다. 매장당 하나만 유지하므로 새로 로그인하면 이전 토큰은 무효가 됩니다. */
     private adminToken: string | null = null;
 
-    constructor(private readonly trackLibrary: TrackLibrary, private readonly trackRatings: TrackRatings, options: StoreOptions) {
+    constructor(
+        private readonly trackLibrary: TrackLibrary,
+        private readonly albumLibrary: AlbumLibrary,
+        private readonly trackRatings: TrackRatings,
+        options: StoreOptions,
+    ) {
         this.id = options.id;
         this.name = options.name;
         this.adminPasswordHash = options.adminPasswordHash;
