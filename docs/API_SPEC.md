@@ -75,7 +75,7 @@ type TrackWithContext = Track & {
 
 // 점주가 설정하는 카탈로그 생성 조건입니다. PUT /admin/catalog/config, GET /admin/catalog/preview, GET /catalog/config가 같은 형식을 사용합니다.
 // randomSeed는 클라이언트가 정하는 0 이상 2^32 미만의 정수이며, 같은 요청은 같은 카탈로그를 만듭니다.
-type CatalogRequest =
+type CatalogConfig =
   | { mode: 'seeds'; spotifyIds: string[]; n: number; randomSeed: number }   // 기준곡 방식
   | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };   // 범위 방식
 
@@ -181,7 +181,7 @@ type NowPlayingEntry = {
 
 ### GET /catalog/config
 
-현재 활성인 영역 설정(`CatalogRequest`)을 반환합니다. 점주가 `PUT /admin/catalog/config`로 설정하기 전에는 설정이 없으므로 본문이 `null`입니다. 기준곡(`spotifyIds`)은 중복이 제거된 상태입니다.
+현재 활성인 영역 설정(`CatalogConfig`)을 반환합니다. 점주가 `PUT /admin/catalog/config`로 설정하기 전에는 설정이 없으므로 본문이 `null`입니다. 기준곡(`spotifyIds`)은 중복이 제거된 상태입니다.
 
 응답 `200 OK` (설정 전):
 ```json

@@ -3,7 +3,7 @@ import { verifyPassword } from '../auth/password.js';
 import { ApiError } from '../errors.js';
 import { requireAdmin } from '../middleware.js';
 import { bodyString, regionQuery } from './input.js';
-import { parseCatalogRequest } from '../tracks/catalogRecommendation.js';
+import { parseCatalogConfig } from '../tracks/catalogRecommendation.js';
 
 export const adminRouter = express.Router();
 
@@ -20,7 +20,7 @@ adminRouter.post('/login', async (req, res) => {
 adminRouter.use(requireAdmin);
 
 adminRouter.put('/catalog/config', (req, res) => {
-    res.json(res.locals.store.setRegionCatalog(parseCatalogRequest(req.body)));
+    res.json(res.locals.store.setRegionCatalog(parseCatalogConfig(req.body)));
 });
 
 adminRouter.get('/catalog/preview', (req, res) => {

@@ -7,7 +7,7 @@ import type { ArtistLibrary } from './artists/artistLibrary.js';
 import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
-import { parseCatalogRequest, type CatalogRequest, type CatalogResult } from './tracks/catalogRecommendation.js';
+import { parseCatalogConfig, type CatalogConfig, type CatalogResult } from './tracks/catalogRecommendation.js';
 
 type PlaySource = 'request' | 'fallback';
 
@@ -63,7 +63,7 @@ export class Store {
     private readonly now: () => number;
     private readonly random: () => number;
 
-    private region: CatalogRequest | null = null;
+    private region: CatalogConfig | null = null;
     /** 현재 카탈로그입니다. 서버를 시작한 직후에는 영역을 설정하기 전이므로 비어 있습니다. */
     private catalog: Track[] = [];
     private catalogIds: Set<string> = new Set();
@@ -105,22 +105,22 @@ export class Store {
     }
 
     /** Validate and sample before committing any state; queue, playback and cooldowns are retained. */
-    setRegionCatalog(input: CatalogRequest): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
-        const request = parseCatalogRequest(input);
-        const result = this.trackLibrary.recommend(request);
-        this.region = request;
+    setRegionCatalog(input: CatalogConfig): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
+        const config = parseCatalogConfig(input);
+        const result = this.trackLibrary.recommend(config);
+        this.region = config;
         this.catalog = result.tracks;
         this.catalogIds = new Set(this.catalog.map(track => track.id));
         this.catalogHash = hashCatalog(this.catalog);
         return { ...result, tracks: this.getCatalog() };
     }
 
-    getRegionPreview(input: CatalogRequest): CatalogResult {
+    getRegionPreview(input: CatalogConfig): CatalogResult {
         return this.trackLibrary.recommend(input);
     }
 
-    getRegion(): CatalogRequest | null {
-        return this.region && parseCatalogRequest(this.region);
+    getRegion(): CatalogConfig | null {
+        return this.region && parseCatalogConfig(this.region);
     }
 
     /** DELETE /admin/queue/:queueId: 대기열에서 곡을 제거합니다. 재생된 것이 아니므로 곡 쿨타임은 적용하지 않습니다. */

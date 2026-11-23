@@ -1,12 +1,12 @@
 import type { Track } from './track.js';
 import type { TrackRow } from '../db/trackRepository.js';
-import { hasValidCoordinates, recommendCatalog, type CatalogRequest, type CatalogResult } from './catalogRecommendation.js';
+import { hasValidCoordinates, recommendCatalog, type CatalogConfig, type CatalogResult } from './catalogRecommendation.js';
 
 /** 전체 곡을 메모리에 올려 두고 조회하는 도구입니다. */
 export interface TrackLibrary {
     /** 전체 곡 수입니다. */
     readonly size: number;
-    recommend(input: CatalogRequest): CatalogResult;
+    recommend(input: CatalogConfig): CatalogResult;
     get(id: string): Track | undefined;
     /** 제목과 아티스트에서 검색어를 찾습니다. 검색어로 시작하는 곡을 먼저 돌려줍니다. */
     search(query: string, limit: number, offset: number): { total: number; tracks: Track[] };
@@ -43,7 +43,7 @@ export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary 
     return {
         size: tracks.length,
 
-        recommend(input: CatalogRequest): CatalogResult {
+        recommend(input: CatalogConfig): CatalogResult {
             return recommendCatalog(recommendationTracks, input);
         },
 
