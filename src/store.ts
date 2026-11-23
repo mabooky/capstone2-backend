@@ -3,6 +3,7 @@ import { ApiError } from './errors.js';
 import { murmur3 } from './murmur3.js';
 import type { TrackLibrary } from './tracks/trackLibrary.js';
 import type { AlbumLibrary } from './albums/albumLibrary.js';
+import type { ArtistLibrary } from './artists/artistLibrary.js';
 import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
@@ -80,6 +81,7 @@ export class Store {
     constructor(
         private readonly trackLibrary: TrackLibrary,
         private readonly albumLibrary: AlbumLibrary,
+        private readonly artistLibrary: ArtistLibrary,
         private readonly trackRatings: TrackRatings,
         options: StoreOptions,
     ) {
