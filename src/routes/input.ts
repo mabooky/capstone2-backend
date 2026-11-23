@@ -41,7 +41,7 @@ export function bodyNumber(body: unknown, key: string): number | undefined {
     return value;
 }
 
-/** Same region schema as PUT /admin/guardrail, with numbers encoded as query strings.
+/** Same region schema as PUT /admin/catalog/config, with numbers encoded as query strings.
  * Seed IDs use repeated spotifyIds query parameters (not comma splitting).
  */
 export function regionQuery(query: Record<string, unknown>): CatalogRequest {

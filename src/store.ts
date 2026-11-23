@@ -134,7 +134,7 @@ export class Store {
     statusOf(track: Track): RequestStatus {
         if (this.nowPlaying?.track.id === track.id) return 'now-playing';
         if (this.queue.some(entry => entry.track.id === track.id)) return 'already-queued';
-        if (!this.catalogIds.has(track.id)) return 'out-of-guardrail';
+        if (!this.catalogIds.has(track.id)) return 'out-of-catalog';
         const startedAt = this.playedAt.get(track.id);
         if (startedAt !== undefined && this.now() - startedAt < this.trackCooldownMs) return 'recently-played';
         return 'available';
@@ -176,7 +176,7 @@ export class Store {
         };
     }
 
-    /** GET /search: 전체 곡에서 검색하고, 카탈로그 밖의 곡에는 out-of-guardrail 상태가 붙습니다. */
+    /** GET /search: 전체 곡에서 검색하고, 카탈로그 밖의 곡에는 out-of-catalog 상태가 붙습니다. */
     search(query: string, limit: number = 20, offset: number = 0, userId?: string): { total: number; tracks: TrackWithContext[] } {
         if (query.trim() === '') {
             throw new ApiError(400, 'INVALID_INPUT', 'q는 비어 있을 수 없습니다.');
@@ -214,7 +214,7 @@ export class Store {
         const track = this.trackLibrary.get(id);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
         if (!this.catalogIds.has(id)) {
-            throw new ApiError(403, 'OUT_OF_GUARDRAIL', '현재 카탈로그에 없는 곡입니다.');
+            throw new ApiError(403, 'OUT_OF_CATALOG', '현재 카탈로그에 없는 곡입니다.');
         }
         const status = this.statusOf(track);
         if (status === 'now-playing' || status === 'already-queued') {
@@ -267,7 +267,7 @@ export class Store {
             takeFromQueue = true;
         } else {
             if (!this.catalogIds.has(id)) {
-                throw new ApiError(403, 'OUT_OF_GUARDRAIL', '현재 카탈로그에 없는 곡입니다.');
+                throw new ApiError(403, 'OUT_OF_CATALOG', '현재 카탈로그에 없는 곡입니다.');
             }
             source = 'fallback';
         }

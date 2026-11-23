@@ -39,10 +39,10 @@
 Spotify ID로 중복 제거 후 기준곡을 확보하고 나머지를 균등 무작위 비복원 추출한다.
 결과도 무작위 순서로 반환하며 부족분을 영역 밖 곡으로 채우지 않는다.
 후보 부족과 0곡을 구분하는 결과 상태를 제공한다. 미등록·좌표 무효 기준곡 요청은 거부한다.
-공식 서비스는 `src/tracks/catalogRecommendation.ts` → 메모리 곡 라이브러리 → Store → `/admin/guardrail`로 연결했다.
+공식 서비스는 `src/tracks/catalogRecommendation.ts` → 메모리 곡 라이브러리 → Store → `/admin/catalog/config`로 연결했다.
 기존 단일 기준점 요청은 제거했으며, 서버 시작 직후 카탈로그는 비어 있다. 영역 요청은 결과 상태를 포함한 객체를 반환한다.
 영역 미리보기도 기존 GET 경로에서 mode 쿼리로 지원하며 공개 `/catalog`는 기존 배열 응답을 유지한다.
-세부 입력·출력과 GET `/guardrail`의 추가 `region` 필드는 [API 명세](docs/API_SPEC.md)를 따른다.
+세부 입력·출력과 GET `/catalog/config`의 추가 `region` 필드는 [API 명세](docs/API_SPEC.md)를 따른다.
 
 ### 점주·고객 기능
 

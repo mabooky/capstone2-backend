@@ -5,7 +5,7 @@ export type ErrorCode =
     | 'INVALID_CREDENTIALS'
     | 'INVALID_KAKAO_CODE'
     | 'KAKAO_UNAVAILABLE'
-    | 'OUT_OF_GUARDRAIL'
+    | 'OUT_OF_CATALOG'
     | 'STORE_NOT_FOUND'
     | 'TRACK_NOT_FOUND'
     | 'QUEUE_ITEM_NOT_FOUND'

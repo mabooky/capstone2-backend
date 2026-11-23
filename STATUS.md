@@ -38,8 +38,8 @@ A 영역 추천·Store·기존 매장 HTTP 연동을 구현하고 합성 데이�
 |---|---|
 | 곡 라이브러리 | 시작 시 PostgreSQL `tracks_v3` 전체 조회(`trackRepository`). ReccoBeats V/E를 `[-1,1]`로 변환하고 조회·검색·최근접 제공 |
 | 매장 서비스 | 영역 기반 카탈로그(서버 시작 직후 빈 카탈로그), 대기열·신청 제한·쿨타임·재생 보고·자동선곡·매장별 관리자 세션 구현 |
-| 공개 API | `/api/stores/:storeId` 아래 GET `/guardrail`, `/catalog`, `/search`, `/state`, `/me`, POST `/queue`; 별도 GET `/api/health` |
-| 관리자 API | POST `/admin/login`, PUT `/admin/guardrail`, GET `/admin/guardrail/preview`, GET `/admin/fallback-track`, PUT `/admin/now-playing`, DELETE `/admin/queue/:queueId` |
+| 공개 API | `/api/stores/:storeId` 아래 GET `/catalog/config`, `/catalog`, `/search`, `/state`, `/me`, POST `/queue`; 별도 GET `/api/health` |
+| 관리자 API | POST `/admin/login`, PUT `/admin/catalog/config`, GET `/admin/catalog/preview`, GET `/admin/fallback-track`, PUT `/admin/now-playing`, DELETE `/admin/queue/:queueId` |
 | 고객 갱신·저장 | `/state`에 `catalogHash`·재생·대기열 제공. 고객 식별은 `X-Client-Id`. Store 상태는 메모리이며 전화번호·영속 고객 이력은 미구현 |
 | 기존 음악 모듈 | 5모델 알고리즘·파일 서비스·SQL VIEW/저장소 구현. 현재 매장 카탈로그는 이 실험 서비스를 호출하지 않음 |
 | 향후 요구 | 영역 기반 생성·샘플링, 기준곡 입력, 블랙리스트, 전화번호 인증/이력은 현재 서비스에 미구현. 정밀 조정/고객 화면은 새 요구 수준의 완료로 볼 수 없음 |
@@ -87,7 +87,7 @@ A 영역 추천·Store·기존 매장 HTTP 연동을 구현하고 합성 데이�
   SQL과 DB 연결 경로는 유지하며 null·빈 문자열 등 무효 좌표를 정상 좌표로 바꾸지 않는다.
 - Store에 영역 설정·미리보기 내부 호출을 연결했다. 갱신 전 검증·추출을 완료하므로 실패 시 상태를 보존한다.
   대기열·재생·쿨타임·인증 정책은 유지한다. PUT/GET 미리보기는 영역 입력(mode)만 받고, 결과 객체를 반환한다. mode가 없으면 400이다.
-  GET `/guardrail`는 영역 설정을 그대로 반환하며 설정 전에는 null이다. 서버 시작 직후 카탈로그는 비어 있다.
+  GET `/catalog/config`는 영역 설정을 그대로 반환하며 설정 전에는 null이다. 서버 시작 직후 카탈로그는 비어 있다.
 - 실행 완료: 기본 타입 검사, 빌드, 음악 강화 타입 검사 통과. 기존 DB 비접속 추천 테스트 39개 통과,
   `new PGlite()` 합성 SQL 검사 67개 통과. 과거 결과를 이번 결과로 대체하지 않는다.
 - 신규 합성 테스트는 영역 판정·추출과 실제 Store/라우터의 로그인·신청·재생·매장 격리를 검증한다.

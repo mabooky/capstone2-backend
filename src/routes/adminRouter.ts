@@ -19,11 +19,11 @@ adminRouter.post('/login', async (req, res) => {
 
 adminRouter.use(requireAdmin);
 
-adminRouter.put('/guardrail', (req, res) => {
+adminRouter.put('/catalog/config', (req, res) => {
     res.json(res.locals.store.setRegionCatalog(parseCatalogRequest(req.body)));
 });
 
-adminRouter.get('/guardrail/preview', (req, res) => {
+adminRouter.get('/catalog/preview', (req, res) => {
     res.json(res.locals.store.getRegionPreview(regionQuery(req.query)));
 });
 

@@ -2,7 +2,7 @@ import type { Track } from '../tracks/track.js';
 
 export type RequestStatus =
     | 'available'
-    | 'out-of-guardrail'
+    | 'out-of-catalog'
     | 'already-queued'
     | 'now-playing'
     | 'recently-played';
