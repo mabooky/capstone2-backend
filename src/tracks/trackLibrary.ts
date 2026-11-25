@@ -1,19 +1,21 @@
 import type { Track } from './track.js';
 import type { TrackRow } from '../db/trackRepository.js';
-import { hasValidCoordinates, recommendCatalog, type CatalogResult } from './catalogRecommendation.js';
-import type { CatalogConfig } from '../models/catalogConfig.js';
+import { isValidCoordinate } from '../models/catalogConfig.js';
 
-/** 전체 곡을 메모리에 올려 두고 조회하는 도구입니다. */
+/** 전체 곡을 메모리에 올려 두고 조회하는 도구입니다. 매장과 무관한 곡 데이터만 다룹니다. */
 export interface TrackLibrary {
-    /** 전체 곡 수입니다. */
-    readonly size: number;
-    recommend(config: CatalogConfig): CatalogResult;
+    /** 전체 곡입니다. ID순으로 정렬되어 있습니다. */
+    readonly tracks: readonly Track[];
     get(id: string): Track | undefined;
     /** 제목과 아티스트에서 검색어를 찾습니다. 검색어로 시작하는 곡을 먼저 돌려줍니다. */
     search(query: string, limit: number, offset: number): { total: number; tracks: Track[] };
 }
 
-/** Pure in-memory snapshot built from tracks_v4 rows; never opens a database. */
+/**
+ * tracks_v4의 행으로 메모리 곡 라이브러리를 만듭니다. DB에는 접속하지 않습니다.
+ * 좌표가 [-1, 1] 범위의 유한한 숫자가 아니거나 ID가 겹치는 행이 있으면 오류를 던집니다.
+ * tracks_v4의 제약상 생길 수 없는 경우이므로, 생겼다면 곡 데이터를 잘못 올린 것입니다.
+ */
 export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary {
     const tracks: Track[] = [...rows]
         .map(row => ({
@@ -28,25 +30,24 @@ export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary 
             valence: row.valence,
             arousal: row.arousal,
         }))
-        // DB가 돌려주는 행 순서는 보장되지 않으므로 먼저 ID로 정렬
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+        // DB가 돌려주는 행 순서는 보장되지 않으므로 먼저 ID로 정렬합니다.
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-    const byId = new Map(tracks.map(track => [track.id, track]));
-    // 추천은 ID별 첫 유효 행을 사용합니다. 전체 곡 조회용 byId의 마지막 행 정책과 구분합니다.
-    const recommendationIds = new Set<string>();
-    const recommendationTracks = tracks.filter(track => {
-        if (!hasValidCoordinates(track) || recommendationIds.has(track.id)) return false;
-        recommendationIds.add(track.id);
-        return true;
-    });
+    const byId = new Map<string, Track>();
+    for (const track of tracks) {
+        if (!isValidCoordinate(track.valence) || !isValidCoordinate(track.arousal)) {
+            throw new Error(`곡(${track.id})의 감정 좌표가 올바르지 않습니다.`);
+        }
+        if (byId.has(track.id)) {
+            throw new Error(`곡 ID(${track.id})가 중복되었습니다.`);
+        }
+        byId.set(track.id, track);
+    }
+
     const searchTexts = tracks.map(track => `${track.title}\n${track.artist}`.toLowerCase());
 
     return {
-        size: tracks.length,
-
-        recommend(config: CatalogConfig): CatalogResult {
-            return recommendCatalog(recommendationTracks, config);
-        },
+        tracks,
 
         get(id: string): Track | undefined {
             return byId.get(id);

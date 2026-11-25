@@ -8,7 +8,7 @@ import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
 import type { CatalogConfig, ExpandedCatalogConfig } from './models/catalogConfig.js';
-import type { CatalogResult } from './tracks/catalogRecommendation.js';
+import { recommendCatalog, type CatalogResult } from './tracks/catalogRecommendation.js';
 
 type PlaySource = 'request' | 'fallback';
 
@@ -112,7 +112,7 @@ export class Store {
      * 대기열, 재생 중인 곡, 곡 쿨타임은 그대로 둡니다.
      */
     setCatalogConfig(config: CatalogConfig): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
-        const result = this.trackLibrary.recommend(config);
+        const result = recommendCatalog(this.trackLibrary, config);
         this.catalogConfig = config;
         this.catalog = result.tracks;
         this.catalogIds = new Set(this.catalog.map(track => track.id));
@@ -122,7 +122,7 @@ export class Store {
 
     /** 미리보기: 설정으로 만들어질 카탈로그를 돌려줍니다. 상태는 바꾸지 않습니다. */
     previewCatalog(input: CatalogConfig): CatalogResult {
-        return this.trackLibrary.recommend(input);
+        return recommendCatalog(this.trackLibrary, input);
     }
 
     /** GET /catalog/config: 현재 설정의 곡 ID를 곡 객체로 펼쳐 돌려줍니다. 설정하기 전이면 null입니다. */

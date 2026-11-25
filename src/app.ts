@@ -46,7 +46,7 @@ async function createStores(
 
 export async function createApp() {
     const globalTrackLibrary = await loadTrackLibrary();
-    console.log(`곡 ${globalTrackLibrary.size}개를 불러왔습니다.`);
+    console.log(`곡 ${globalTrackLibrary.tracks.length}개를 불러왔습니다.`);
     const globalAlbumLibrary = await loadAlbumLibrary();
     console.log(`앨범 ${globalAlbumLibrary.size}개를 불러왔습니다.`);
     const globalArtistLibrary = await loadArtistLibrary();

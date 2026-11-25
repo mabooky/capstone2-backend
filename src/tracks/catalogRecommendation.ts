@@ -1,6 +1,7 @@
 import { murmur3 } from '../murmur3.js';
-import { CatalogConfigError, isValidCoordinate, type CatalogConfig } from '../models/catalogConfig.js';
+import { CatalogConfigError, type CatalogConfig } from '../models/catalogConfig.js';
 import type { Track } from './track.js';
+import type { TrackLibrary } from './trackLibrary.js';
 
 /** 카탈로그를 만든 결과입니다. candidateCount는 기준곡을 포함한 영역 안의 고유 후보 곡 수입니다. */
 export type CatalogResult = {
@@ -16,10 +17,6 @@ const BUFFER = 0.1;
 
 /** 경계를 계산할 때 허용하는 부동소수점 오차입니다. 정규화한 좌표 기준의 절댓값입니다. */
 const EPS = 1e-12;
-
-export function hasValidCoordinates(point: Point): boolean {
-    return isValidCoordinate(point.valence) && isValidCoordinate(point.arousal);
-}
 
 function cross(a: Point, b: Point, c: Point): number {
     return (b.valence - a.valence) * (c.arousal - a.arousal) - (b.arousal - a.arousal) * (c.valence - a.valence);
@@ -72,24 +69,25 @@ function rankByScore(tracks: readonly Track[], randomSeed: number): Track[] {
 }
 
 /**
- * 설정에 따라 카탈로그를 만듭니다. library는 곡 라이브러리가 미리 검증하고 ID 중복을 없앤 추천용 곡 목록이며, DB에는 접근하지 않습니다.
- * config는 parseCatalogConfig로 형식이 검증된 값이어야 합니다. 기준곡이 library에 없거나 좌표가 유효하지 않으면 CatalogConfigError를 던집니다.
+ * 설정에 따라 곡 라이브러리에서 카탈로그를 만듭니다. DB에는 접근하지 않습니다.
+ * config는 parseCatalogConfig로 형식이 검증된 값이어야 합니다. 기준곡이 라이브러리에 없으면 CatalogConfigError를 던집니다.
  * 후보를 randomSeed로 정한 점수순으로 정렬해 앞의 곡을 뽑으므로, 같은 입력은 항상 같은 결과입니다.
  */
-export function recommendCatalog(library: readonly Track[], config: CatalogConfig): CatalogResult {
+export function recommendCatalog(trackLibrary: TrackLibrary, config: CatalogConfig): CatalogResult {
     const seeds: Track[] = config.mode === 'seeds'
         ? config.seedTrackSpotifyIds.map(id => {
-            const track = library.find(track => track.id === id);
-            if (!track || !hasValidCoordinates(track)) throw new CatalogConfigError('기준곡이 없거나 유효한 감정 좌표가 없습니다.');
+            const track = trackLibrary.get(id);
+            if (!track) throw new CatalogConfigError('등록되지 않은 기준곡이 있습니다.');
             return track;
         })
         : [];
 
     const polygon = hull(seeds);
-    const candidates = library.filter(p => config.mode === 'range'
+    const candidates = trackLibrary.tracks.filter(p => config.mode === 'range'
         ? p.valence >= config.valenceMin - EPS && p.valence <= config.valenceMax + EPS &&
           p.arousal >= config.energyMin - EPS && p.arousal <= config.energyMax + EPS
-        : inBufferedHull(p, polygon));
+        : inBufferedHull(p, polygon)
+    );
 
     const seedIds = new Set(seeds.map(t => t.id));
     const others = rankByScore(candidates.filter(t => !seedIds.has(t.id)), config.randomSeed).slice(0, config.n - seeds.length);
