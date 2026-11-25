@@ -7,7 +7,8 @@ import type { ArtistLibrary } from './artists/artistLibrary.js';
 import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
-import { parseCatalogConfig, type CatalogConfig, type CatalogResult, type ExpandedCatalogConfig } from './tracks/catalogRecommendation.js';
+import { parseCatalogConfig, type CatalogConfig, type ExpandedCatalogConfig } from './models/catalogConfig.js';
+import type { CatalogResult } from './tracks/catalogRecommendation.js';
 
 type PlaySource = 'request' | 'fallback';
 

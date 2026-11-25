@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
 import { ApiError } from './errors.js';
-import { CatalogConfigError } from './tracks/catalogConfigError.js';
+import { CatalogConfigError } from './models/catalogConfig.js';
 import type { Store } from './store.js';
 import { findUserBySessionHash } from './db/sessionRepository.js';
 import type { UserRow } from './db/userRepository.js';

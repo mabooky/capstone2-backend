@@ -1,22 +1,6 @@
 import { murmur3 } from '../murmur3.js';
-import { CatalogConfigError } from './catalogConfigError.js';
+import { CatalogConfigError, isValidCoordinate, parseCatalogConfig, type CatalogConfig } from '../models/catalogConfig.js';
 import type { Track } from './track.js';
-
-/**
- * 점주가 설정하는 카탈로그 생성 조건입니다. 곡의 arousal 값은 정규화한 ReccoBeats Energy입니다.
- * randomSeed는 클라이언트가 정하는 0 이상 2^32 미만의 정수이며, 같은 설정은 항상 같은 카탈로그를 만듭니다.
- */
-export type CatalogConfig =
-    | { mode: 'seeds'; seedTrackSpotifyIds: string[]; n: number; randomSeed: number }
-    | { mode: 'range'; valenceMin: number; valenceMax: number; energyMin: number; energyMax: number; n: number; randomSeed: number };
-
-/**
- * CatalogConfig의 곡 ID를 곡 객체로 펼친 것입니다. GET /catalog/config가 이 형식으로 응답합니다.
- * 기준곡 방식의 seedTrackSpotifyIds가 같은 순서의 seedTracks로 바뀌는 것 말고는 CatalogConfig와 같습니다.
- */
-export type ExpandedCatalogConfig =
-    | { mode: 'seeds'; seedTracks: Track[]; n: number; randomSeed: number }
-    | Extract<CatalogConfig, { mode: 'range' }>;
 
 /** 카탈로그를 만든 결과입니다. candidateCount는 기준곡을 포함한 영역 안의 고유 후보 곡 수입니다. */
 export type CatalogResult = {
@@ -33,61 +17,8 @@ const BUFFER = 0.1;
 /** 경계를 계산할 때 허용하는 부동소수점 오차입니다. 정규화한 좌표 기준의 절댓값입니다. */
 const EPS = 1e-12;
 
-function invalid(message: string): never {
-    throw new CatalogConfigError(message);
-}
-
-function coordinate(value: unknown): value is number {
-    return typeof value === 'number' && Number.isFinite(value) && value >= -1 && value <= 1;
-}
-
 export function hasValidCoordinates(point: Point): boolean {
-    return coordinate(point.valence) && coordinate(point.arousal);
-}
-
-/** 외부 입력이든 내부 호출이든 실행 시점에 설정을 검증합니다. 값을 다른 형식으로 바꾸거나 범위 안으로 끌어오지 않습니다. */
-export function parseCatalogConfig(value: unknown): CatalogConfig {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        invalid('영역 설정 객체가 필요합니다.');
-    }
-    const r = value as Record<string, unknown>;
-
-    if (!Number.isInteger(r.n) || (r.n as number) < 1 || (r.n as number) > 100) {
-        invalid('n은 1~100 정수여야 합니다.');
-    }
-    const n = r.n as number;
-
-    if (!Number.isInteger(r.randomSeed) || (r.randomSeed as number) < 0 || (r.randomSeed as number) >= 2 ** 32) {
-        invalid('randomSeed는 0 이상 2^32 미만의 정수여야 합니다.');
-    }
-    const randomSeed = r.randomSeed as number;
-
-    if (r.mode === 'seeds') {
-        if (Object.keys(r).some(key => !['mode', 'seedTrackSpotifyIds', 'n', 'randomSeed'].includes(key))) {
-            invalid('지원하지 않는 영역 입력 필드입니다.');
-        }
-        if (!Array.isArray(r.seedTrackSpotifyIds) || r.seedTrackSpotifyIds.some(id => typeof id !== 'string' || !/^[A-Za-z0-9]{22}$/.test(id))) {
-            invalid('seedTrackSpotifyIds는 22자리 Spotify ID 배열이어야 합니다.');
-        }
-        const seedTrackSpotifyIds = [...new Set(r.seedTrackSpotifyIds as string[])];
-        if (seedTrackSpotifyIds.length < 3) invalid('서로 다른 기준곡이 3곡 이상 필요합니다.');
-        if (seedTrackSpotifyIds.length > n) invalid('기준곡 수는 n을 초과할 수 없습니다.');
-        return { mode: 'seeds', seedTrackSpotifyIds, n, randomSeed };
-    }
-
-    if (r.mode === 'range') {
-        if (Object.keys(r).some(key => !['mode', 'valenceMin', 'valenceMax', 'energyMin', 'energyMax', 'n', 'randomSeed'].includes(key))) {
-            invalid('지원하지 않는 영역 입력 필드입니다.');
-        }
-        const { valenceMin, valenceMax, energyMin, energyMax } = r;
-        if (!coordinate(valenceMin) || !coordinate(valenceMax) || !coordinate(energyMin) || !coordinate(energyMax)) {
-            invalid('Valence/Energy 범위는 -1~1 유한 숫자여야 합니다.');
-        }
-        if (valenceMin > valenceMax || energyMin > energyMax) invalid('최솟값은 최댓값보다 클 수 없습니다.');
-        return { mode: 'range', valenceMin, valenceMax, energyMin, energyMax, n, randomSeed };
-    }
-
-    return invalid('mode는 seeds 또는 range여야 합니다.');
+    return isValidCoordinate(point.valence) && isValidCoordinate(point.arousal);
 }
 
 function cross(a: Point, b: Point, c: Point): number {
