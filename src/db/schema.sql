@@ -81,6 +81,9 @@ CREATE TABLE IF NOT EXISTS stores (
     id text PRIMARY KEY CHECK (char_length(id) = 8),
     name text NOT NULL CHECK (btrim(name) <> '' AND char_length(name) <= 50),
     admin_password_hash text NOT NULL, -- scrypt$N$r$p$salt$hash
+    -- 점주가 마지막으로 저장한 카탈로그 설정(API 명세의 CatalogConfig)입니다. 한 번도 설정하지 않았으면 NULL입니다.
+    -- 서버는 시작할 때 이 값으로 카탈로그를 다시 만듭니다. randomSeed가 들어 있어 곡 데이터가 같으면 같은 카탈로그가 나옵니다.
+    catalog_config jsonb CHECK (jsonb_typeof(catalog_config) = 'object'),
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
