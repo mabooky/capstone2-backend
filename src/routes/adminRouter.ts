@@ -2,7 +2,7 @@ import express from 'express';
 import { verifyPassword } from '../auth/password.js';
 import { ApiError } from '../errors.js';
 import { requireAdmin } from '../middleware.js';
-import { bodyString, regionQuery } from './input.js';
+import { bodyString } from './input.js';
 import { parseCatalogConfig } from '../models/catalogConfig.js';
 
 export const adminRouter = express.Router();
@@ -23,8 +23,8 @@ adminRouter.put('/catalog/config', (req, res) => {
     res.json(res.locals.store.setCatalogConfig(parseCatalogConfig(req.body)));
 });
 
-adminRouter.get('/catalog/preview', (req, res) => {
-    res.json(res.locals.store.previewCatalog(regionQuery(req.query)));
+adminRouter.post('/catalog/preview', (req, res) => {
+    res.json(res.locals.store.previewCatalog(parseCatalogConfig(req.body)));
 });
 
 adminRouter.get('/fallback-track', (req, res) => {

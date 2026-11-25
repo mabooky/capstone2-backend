@@ -7,7 +7,7 @@ import type { ArtistLibrary } from './artists/artistLibrary.js';
 import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
-import type { CatalogConfig, ExpandedCatalogConfig } from './models/catalogConfig.js';
+import { compileBlacklistPredicate, type CatalogConfig, type ExpandedCatalogConfig } from './models/catalogConfig.js';
 import { recommendCatalog, type CatalogResult } from './tracks/catalogRecommendation.js';
 
 type PlaySource = 'request' | 'fallback';
@@ -66,6 +66,8 @@ export class Store {
 
     /** 현재 카탈로그를 만든 설정입니다. 설정하기 전이면 null입니다. */
     private catalogConfig: CatalogConfig | null = null;
+    /** 현재 설정의 블랙리스트에 곡이 걸리는지 판정합니다. 설정하기 전에는 어떤 곡도 걸리지 않습니다. */
+    private isBlacklisted: (track: Track) => boolean = () => false;
     /** 현재 카탈로그입니다. 서버를 시작한 직후에는 영역을 설정하기 전이므로 비어 있습니다. */
     private catalog: Track[] = [];
     private catalogIds: Set<string> = new Set();
@@ -108,12 +110,13 @@ export class Store {
 
     /**
      * PUT /admin/catalog/config: 형식이 검증된 설정으로 카탈로그를 만든 뒤에 상태를 바꿉니다.
-     * 기준곡이 라이브러리에 없으면 CatalogConfigError를 던지며, 이때 상태는 바뀌지 않습니다.
+     * 기준곡이나 블랙리스트의 곡, 아티스트가 라이브러리에 없거나 기준곡이 블랙리스트에 걸리면 CatalogConfigError를 던지며, 이때 상태는 바뀌지 않습니다.
      * 대기열, 재생 중인 곡, 곡 쿨타임은 그대로 둡니다.
      */
     setCatalogConfig(config: CatalogConfig): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
-        const result = recommendCatalog(this.trackLibrary, config);
+        const result = recommendCatalog(this.trackLibrary, this.artistLibrary, config);
         this.catalogConfig = config;
+        this.isBlacklisted = compileBlacklistPredicate(config.blacklist);
         this.catalog = result.tracks;
         this.catalogIds = new Set(this.catalog.map(track => track.id));
         this.catalogHash = hashCatalog(this.catalog);
@@ -122,16 +125,21 @@ export class Store {
 
     /** 미리보기: 설정으로 만들어질 카탈로그를 돌려줍니다. 상태는 바꾸지 않습니다. */
     previewCatalog(input: CatalogConfig): CatalogResult {
-        return recommendCatalog(this.trackLibrary, input);
+        return recommendCatalog(this.trackLibrary, this.artistLibrary, input);
     }
 
-    /** GET /catalog/config: 현재 설정의 곡 ID를 곡 객체로 펼쳐 돌려줍니다. 설정하기 전이면 null입니다. */
+    /** GET /catalog/config: 현재 설정의 곡 ID와 아티스트 ID를 객체로 펼쳐 돌려줍니다. 설정하기 전이면 null입니다. */
     getCatalogConfig(): ExpandedCatalogConfig | null {
         const config = this.catalogConfig;
-        if (config === null || config.mode === 'range') return config;
+        if (config === null) return null;
+        // 설정할 때 같은 라이브러리로 기준곡과 블랙리스트의 곡, 아티스트가 모두 있는지 확인했으므로 get이 undefined를 돌려주지 않습니다.
+        const blacklist = {
+            tracks: config.blacklist.trackSpotifyIds.map(id => this.trackLibrary.get(id)!),
+            artists: config.blacklist.artistSpotifyIds.map(id => this.artistLibrary.get(id)!),
+        };
+        if (config.mode === 'range') return { ...config, blacklist };
         const { seedTrackSpotifyIds, ...rest } = config;
-        // 설정할 때 같은 곡 라이브러리로 기준곡이 모두 있는지 확인했으므로 get이 undefined를 돌려주지 않습니다.
-        return { ...rest, seedTracks: seedTrackSpotifyIds.map(id => this.trackLibrary.get(id)!) };
+        return { ...rest, seedTracks: seedTrackSpotifyIds.map(id => this.trackLibrary.get(id)!), blacklist };
     }
 
     /** DELETE /admin/queue/:queueId: 대기열에서 곡을 제거합니다. 재생된 것이 아니므로 곡 쿨타임은 적용하지 않습니다. */
@@ -145,6 +153,7 @@ export class Store {
     statusOf(track: Track): RequestStatus {
         if (this.nowPlaying?.track.id === track.id) return 'now-playing';
         if (this.queue.some(entry => entry.track.id === track.id)) return 'already-queued';
+        if (this.isBlacklisted(track)) return 'blacklisted';
         if (!this.catalogIds.has(track.id)) return 'out-of-catalog';
         const startedAt = this.playedAt.get(track.id);
         if (startedAt !== undefined && this.now() - startedAt < this.trackCooldownMs) return 'recently-played';
@@ -187,7 +196,7 @@ export class Store {
         };
     }
 
-    /** GET /search: 전체 곡에서 검색하고, 카탈로그 밖의 곡에는 out-of-catalog 상태가 붙습니다. */
+    /** GET /search: 전체 곡에서 검색합니다. 블랙리스트에 걸린 곡에는 blacklisted, 그 밖에 카탈로그 밖의 곡에는 out-of-catalog 상태가 붙습니다. */
     search(query: string, limit: number = 20, offset: number = 0, userId?: string): { total: number; tracks: TrackWithContext[] } {
         if (query.trim() === '') {
             throw new ApiError(400, 'INVALID_INPUT', 'q는 비어 있을 수 없습니다.');
@@ -224,6 +233,9 @@ export class Store {
         // ---- 검사 ----
         const track = this.trackLibrary.get(id);
         if (!track) throw new ApiError(404, 'TRACK_NOT_FOUND', '등록되지 않은 곡입니다.');
+        if (this.isBlacklisted(track)) {
+            throw new ApiError(403, 'BLACKLISTED', '이 매장에서 제외한 곡입니다.');
+        }
         if (!this.catalogIds.has(id)) {
             throw new ApiError(403, 'OUT_OF_CATALOG', '현재 카탈로그에 없는 곡입니다.');
         }
@@ -277,6 +289,9 @@ export class Store {
             source = 'request';
             takeFromQueue = true;
         } else {
+            if (this.isBlacklisted(track)) {
+                throw new ApiError(403, 'BLACKLISTED', '이 매장에서 제외한 곡입니다.');
+            }
             if (!this.catalogIds.has(id)) {
                 throw new ApiError(403, 'OUT_OF_CATALOG', '현재 카탈로그에 없는 곡입니다.');
             }

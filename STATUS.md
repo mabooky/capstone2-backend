@@ -39,7 +39,7 @@ A 영역 추천·Store·기존 매장 HTTP 연동을 구현하고 합성 데이�
 | 곡 라이브러리 | 시작 시 PostgreSQL `tracks_v3` 전체 조회(`trackRepository`). ReccoBeats V/E를 `[-1,1]`로 변환하고 조회·검색·최근접 제공 |
 | 매장 서비스 | 영역 기반 카탈로그(서버 시작 직후 빈 카탈로그), 대기열·신청 제한·쿨타임·재생 보고·자동선곡·매장별 관리자 세션 구현 |
 | 공개 API | `/api/stores/:storeId` 아래 GET `/catalog/config`, `/catalog`, `/search`, `/state`, `/me`, POST `/queue`; 별도 GET `/api/health` |
-| 관리자 API | POST `/admin/login`, PUT `/admin/catalog/config`, GET `/admin/catalog/preview`, GET `/admin/fallback-track`, PUT `/admin/now-playing`, DELETE `/admin/queue/:queueId` |
+| 관리자 API | POST `/admin/login`, PUT `/admin/catalog/config`, POST `/admin/catalog/preview`, GET `/admin/fallback-track`, PUT `/admin/now-playing`, DELETE `/admin/queue/:queueId` |
 | 고객 갱신·저장 | `/state`에 `catalogHash`·재생·대기열 제공. 고객 식별은 `X-Client-Id`. Store 상태는 메모리이며 전화번호·영속 고객 이력은 미구현 |
 | 기존 음악 모듈 | 5모델 알고리즘·파일 서비스·SQL VIEW/저장소 구현. 현재 매장 카탈로그는 이 실험 서비스를 호출하지 않음 |
 | 향후 요구 | 영역 기반 생성·샘플링, 기준곡 입력, 블랙리스트, 전화번호 인증/이력은 현재 서비스에 미구현. 정밀 조정/고객 화면은 새 요구 수준의 완료로 볼 수 없음 |
