@@ -7,7 +7,7 @@ import type { ArtistLibrary } from './artists/artistLibrary.js';
 import type { TrackRatings } from './tracks/trackRatings.js';
 import type { Track } from './tracks/track.js';
 import type { RequestStatus, TrackWithContext } from './models/trackWithContext.js';
-import { parseCatalogConfig, type CatalogConfig, type ExpandedCatalogConfig } from './models/catalogConfig.js';
+import type { CatalogConfig, ExpandedCatalogConfig } from './models/catalogConfig.js';
 import type { CatalogResult } from './tracks/catalogRecommendation.js';
 
 type PlaySource = 'request' | 'fallback';
@@ -107,11 +107,11 @@ export class Store {
     }
 
     /**
-     * PUT /admin/catalog/config: 설정을 검증하고 카탈로그를 만든 뒤에 상태를 바꿉니다.
+     * PUT /admin/catalog/config: 형식이 검증된 설정으로 카탈로그를 만든 뒤에 상태를 바꿉니다.
+     * 기준곡이 라이브러리에 없으면 CatalogConfigError를 던지며, 이때 상태는 바뀌지 않습니다.
      * 대기열, 재생 중인 곡, 곡 쿨타임은 그대로 둡니다.
      */
-    setCatalogConfig(input: CatalogConfig): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
-        const config = parseCatalogConfig(input);
+    setCatalogConfig(config: CatalogConfig): Omit<CatalogResult, 'tracks'> & { tracks: TrackWithContext[] } {
         const result = this.trackLibrary.recommend(config);
         this.catalogConfig = config;
         this.catalog = result.tracks;

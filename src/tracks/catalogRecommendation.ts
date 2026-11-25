@@ -1,5 +1,5 @@
 import { murmur3 } from '../murmur3.js';
-import { CatalogConfigError, isValidCoordinate, parseCatalogConfig, type CatalogConfig } from '../models/catalogConfig.js';
+import { CatalogConfigError, isValidCoordinate, type CatalogConfig } from '../models/catalogConfig.js';
 import type { Track } from './track.js';
 
 /** 카탈로그를 만든 결과입니다. candidateCount는 기준곡을 포함한 영역 안의 고유 후보 곡 수입니다. */
@@ -73,11 +73,10 @@ function rankByScore(tracks: readonly Track[], randomSeed: number): Track[] {
 
 /**
  * 설정에 따라 카탈로그를 만듭니다. library는 곡 라이브러리가 미리 검증하고 ID 중복을 없앤 추천용 곡 목록이며, DB에는 접근하지 않습니다.
+ * config는 parseCatalogConfig로 형식이 검증된 값이어야 합니다. 기준곡이 library에 없거나 좌표가 유효하지 않으면 CatalogConfigError를 던집니다.
  * 후보를 randomSeed로 정한 점수순으로 정렬해 앞의 곡을 뽑으므로, 같은 입력은 항상 같은 결과입니다.
  */
-export function recommendCatalog(library: readonly Track[], input: CatalogConfig): CatalogResult {
-    const config = parseCatalogConfig(input);
-
+export function recommendCatalog(library: readonly Track[], config: CatalogConfig): CatalogResult {
     const seeds: Track[] = config.mode === 'seeds'
         ? config.seedTrackSpotifyIds.map(id => {
             const track = library.find(track => track.id === id);

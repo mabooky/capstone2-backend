@@ -7,7 +7,7 @@ import type { CatalogConfig } from '../models/catalogConfig.js';
 export interface TrackLibrary {
     /** 전체 곡 수입니다. */
     readonly size: number;
-    recommend(input: CatalogConfig): CatalogResult;
+    recommend(config: CatalogConfig): CatalogResult;
     get(id: string): Track | undefined;
     /** 제목과 아티스트에서 검색어를 찾습니다. 검색어로 시작하는 곡을 먼저 돌려줍니다. */
     search(query: string, limit: number, offset: number): { total: number; tracks: Track[] };
@@ -44,8 +44,8 @@ export function createTrackLibraryFrom(rows: readonly TrackRow[]): TrackLibrary 
     return {
         size: tracks.length,
 
-        recommend(input: CatalogConfig): CatalogResult {
-            return recommendCatalog(recommendationTracks, input);
+        recommend(config: CatalogConfig): CatalogResult {
+            return recommendCatalog(recommendationTracks, config);
         },
 
         get(id: string): Track | undefined {
